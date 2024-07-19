@@ -9,8 +9,7 @@ Contact me for any issue of feedback: cgvinny@adobe.com
 
 ## Installation
 
-1. launch the  `vg_painter_utilities_installer.exe`
-2. Make sure that the 'python' folder located in your documents is the one selected during the installation:
+1. Copy:the 'plugins' & 'modules' folders into the 'python' folder located here by default (please adapt: if your location is different) 
 
    `C:\Users\[USER]\Documents\Adobe\Adobe Substance 3D Painter\python`
 
