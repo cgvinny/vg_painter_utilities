@@ -8,6 +8,7 @@ Feel free to use, reuse and adapt this content to your needs
 Contact me for any issue of feedback: cgvinny@adobe.com
 
 ## Installation
+Installation and details in this [https://youtu.be/KjRgUkQnXDk ](video) here
 
 1. Copy:the 'plugins' & 'modules' folders into the 'python' folder located here by default (please adapt: if your location is different) 
 
