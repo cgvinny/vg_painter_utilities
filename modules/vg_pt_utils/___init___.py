@@ -11,4 +11,4 @@ that are meant to give access to functions  made for `Substance 3D Painter`
 
 __author__ = "Vincent GAULT - Adobe"
 
-import vg_utils
+import vg_pt_utils

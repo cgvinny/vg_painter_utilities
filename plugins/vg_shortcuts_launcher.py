@@ -44,23 +44,23 @@ plugin_shortcuts_widgets = []
 
 
 
-
 ######## FILL LAYER SHORTCUTS (F) ########
 
 #Function to call for Ctrl + F shortcut
 def on_ctrl_plus_f_shortcut_activated():
-    stack_manager = vg_layerstack.CurrentStackManager()
-    stack_manager.new_fill_with_bc()
+    stack_manager = vg_layerstack.VG_StackManager()
+    stack_manager.add_layer('fill', active_channels=["BaseColor"])
 
 #Function to call for  Ctrl + alt + F shortcut
 def on_ctrl_plus_alt_plus_f_shortcut_activated():
-    stack_manager = vg_layerstack.CurrentStackManager()
-    stack_manager.new_fill_with_height()
+    stack_manager = vg_layerstack.VG_StackManager()
+    stack_manager.add_layer('fill', active_channels=["Height"])
     
 #Function to call for  Ctrl + Shift + F shortcut
 def on_ctrl_plus_shift_plus_f_shortcut_activated():
-    stack_manager = vg_layerstack.CurrentStackManager()    
-    stack_manager.new_fill_all_channels()
+    stack_manager = vg_layerstack.VG_StackManager()    
+    stack_manager.add_layer('fill')
+    
     
     
     
@@ -69,8 +69,8 @@ def on_ctrl_plus_shift_plus_f_shortcut_activated():
 
 #Function to call for  Ctrl + P shortcut
 def on_ctrl_plus_p_shortcut_activated():
-    stack_manager = vg_layerstack.CurrentStackManager()
-    stack_manager.new_paint_layer()
+    stack_manager = vg_layerstack.VG_StackManager()
+    stack_manager.add_layer('paint')
     
     
     
@@ -79,17 +79,17 @@ def on_ctrl_plus_p_shortcut_activated():
 
 #Function to call for  Ctrl + M shortcut
 def on_ctrl_plus_m_shortcut_activated():
-    stack_manager = vg_layerstack.CurrentStackManager()
+    stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_mask()
     
 #Function to call for  Ctrl + shift + M shortcut
 def on_ctrl_plus_shift_plus_m_shortcut_activated():
-    stack_manager = vg_layerstack.CurrentStackManager()
+    stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_black_mask_with_ao_generator()
     
 #Function to call for  Ctrl + Alt + M shortcut
 def on_ctrl_plus_alt_plus_m_shortcut_activated():
-    stack_manager = vg_layerstack.CurrentStackManager()
+    stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_black_mask_with_curvature_generator()
     
     
@@ -187,5 +187,3 @@ def reload_plugin():
 if __name__ == "__main__":
     importlib.reload(vg_layerstack)  
     start_plugin()
-    
-    
