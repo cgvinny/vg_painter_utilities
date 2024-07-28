@@ -114,6 +114,7 @@ class VG_StackManager:
 
             # Select newly created layer
             layerstack.set_selected_nodes([new_layer])
+            return new_layer
 
     
     
