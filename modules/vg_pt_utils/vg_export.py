@@ -111,7 +111,7 @@ class VG_ExportManager:
         
         # Create a new fill layer in the active texture set
         current_stack_manager = vg_pt_utils.vg_layerstack.VG_StackManager()
-        new_layer = current_stack_manager.add_layer('fill')
+        new_layer = current_stack_manager.add_layer('fill', layer_position="On Top")
         new_layer.set_name("Stack layer")
         new_channel_set = new_layer.active_channels
         new_channel_set.remove(layerstack.ChannelType.Normal)

@@ -80,17 +80,37 @@ class VG_StackManager:
     
     
     
-    def add_layer(self, layer_type, active_channels=None):
+    def add_layer(self, layer_type, active_channels=None, layer_position="Above"):
         """Add a layer of specified type to the current stack with optional active channels"""
+        
+        
+            
+        
         if self._current_stack is None:
             logging.error("No active stack found")
         
         else:
+            insert_position = None
+            selected_layer = layerstack.get_selected_nodes(self._current_stack)
             
-
-            # Insert at the top of the given textureset layer stack
-            insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
+            if layer_position == "Above":
+                # Insert a layer above new_layer                
+                insert_position = layerstack.InsertPosition.above_node(selected_layer[0])
+            elif layer_position == "On Top":
+              # Insert at the top of the given textureset layer stack
+                insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
+            else:
+                logging.error("layer_position parameter must be 'Above' or 'Below'")
+            
+            
+            if len(selected_layer) ==0:
+                insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
+              
+               
             new_layer = None
+            
+            
+            
             
             if layer_type == 'fill':                
                 new_layer = layerstack.insert_fill(insert_position)
