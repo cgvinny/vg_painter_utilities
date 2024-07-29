@@ -7,7 +7,7 @@
 
 
 
-
+import os
 from substance_painter import project, export, textureset, resource, layerstack
 import vg_pt_utils
 import vg_pt_utils.vg_layerstack
@@ -59,8 +59,7 @@ class VG_ExportManager:
         # Get the active texture set
         texture_set = textureset.get_active_stack()
         texture_set_name = str(texture_set.material())
-        testUVtiles = textureset.TextureSet.all_uv_tiles(texture_set.material())
-        print(testUVtiles)
+        
 
         
         # Configure the export settings

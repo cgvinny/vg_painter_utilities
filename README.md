@@ -48,6 +48,3 @@ In Substance 3D Painter; go to the "Python" top menu and reload the plugins fold
 
 ---
 `Ctrl + shift + G`: Create new layer from what is visible in the stack (so you can delete these layers if you don't need to edit them anymore, thus improving performances.). Only works with the basic PBR channels at the moment (Base Color, Metal, roughness, height, Normal). Note that normal channel is deactivated, to avoid generatin normal information twice with the height map.
-
-
-
