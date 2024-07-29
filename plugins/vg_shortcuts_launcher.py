@@ -34,9 +34,10 @@ __author__ = "Vincent GAULT - Adobe"
 # Modules import
 from PySide2 import QtWidgets, QtGui, QtCore
 import importlib
+import os
 
 from substance_painter import ui, logging
-from vg_pt_utils import vg_layerstack
+from vg_pt_utils import vg_export, vg_layerstack
 
 
 plugin_shortcuts_widgets = []
@@ -91,9 +92,26 @@ def on_ctrl_plus_shift_plus_m_shortcut_activated():
 def on_ctrl_plus_alt_plus_m_shortcut_activated():
     stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_black_mask_with_curvature_generator()
+
+###########################################################    
+
+
+#Function to call for  Ctrl + shift + G shortcut
+def on_ctrl_plus_shift_plus_g_shortcut_activated():
+    export_path = os.path.join(os.getenv('USERPROFILE'), 'Documents/Adobe/Adobe Substance 3D Painter/export')
+
+    export_preset_name = "PBR Metallic Roughness"
+
+    exporter = vg_export.VG_ExportManager(export_path, export_preset_name)
+    exported_textures = exporter.export_active_texture_set()    
+    exporter.import_textures_to_layer(exported_textures)
     
-    
-    
+
+###########################################################    
+
+
+
+
 
 def define_shortcuts():
     "This function is called to define the different shortcuts"    
@@ -137,6 +155,11 @@ def define_shortcuts():
     plugin_shortcuts_widgets.append(ctrl_plus_alt_plus_m_shortcut)  
     ctrl_plus_alt_plus_m_shortcut.activated.connect(on_ctrl_plus_alt_plus_m_shortcut_activated)
     
+    # Create a keyboard shortcut for "Ctrl + Shift + G" & connect it to the function
+    ctrl_plus_shift_plus_g_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_G), ui.get_main_window())
+    plugin_shortcuts_widgets.append(ctrl_plus_shift_plus_g_shortcut)  
+    ctrl_plus_shift_plus_g_shortcut.activated.connect(on_ctrl_plus_shift_plus_g_shortcut_activated)
+    
     
     
     
@@ -165,6 +188,8 @@ def start_plugin():
     logging.info("Ctrl + M: add black mask to selected layer")
     logging.info("Ctrl + Shift + M: add black mask with AO Generator")
     logging.info("Ctrl + alt + M: add mask Curvature Generator")
+    logging.info("---")
+    logging.info("Ctrl + Shift + G: Generate layer from what's visible in Stack")
     
 
 
@@ -180,10 +205,12 @@ def close_plugin():
 
 
 def reload_plugin():
-    importlib.reload(vg_layerstack)    
+    importlib.reload(vg_layerstack)
+    importlib.reload(vg_export)  
 
     
 
 if __name__ == "__main__":
-    importlib.reload(vg_layerstack)  
+    importlib.reload(vg_layerstack)
+    importlib.reload(vg_export)  
     start_plugin()
