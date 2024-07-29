@@ -96,8 +96,8 @@ def on_ctrl_plus_alt_plus_m_shortcut_activated():
 ###########################################################    
 
 
-#Function to call for  Ctrl + G shortcut
-def on_ctrl_plus_g_shortcut_activated():
+#Function to call for  Ctrl + shift + G shortcut
+def on_ctrl_plus_shift_plus_g_shortcut_activated():
     export_path = os.path.join(os.getenv('USERPROFILE'), 'Documents/Adobe/Adobe Substance 3D Painter/export')
 
     export_preset_name = "PBR Metallic Roughness"
@@ -155,10 +155,10 @@ def define_shortcuts():
     plugin_shortcuts_widgets.append(ctrl_plus_alt_plus_m_shortcut)  
     ctrl_plus_alt_plus_m_shortcut.activated.connect(on_ctrl_plus_alt_plus_m_shortcut_activated)
     
-    # Create a keyboard shortcut for "Ctrl + G" & connect it to the function
-    ctrl_plus_g_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_G), ui.get_main_window())
-    plugin_shortcuts_widgets.append(ctrl_plus_g_shortcut)  
-    ctrl_plus_g_shortcut.activated.connect(on_ctrl_plus_g_shortcut_activated)
+    # Create a keyboard shortcut for "Ctrl + Shift + G" & connect it to the function
+    ctrl_plus_shift_plus_g_shortcut = QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_G), ui.get_main_window())
+    plugin_shortcuts_widgets.append(ctrl_plus_shift_plus_g_shortcut)  
+    ctrl_plus_shift_plus_g_shortcut.activated.connect(on_ctrl_plus_shift_plus_g_shortcut_activated)
     
     
     
@@ -189,7 +189,7 @@ def start_plugin():
     logging.info("Ctrl + Shift + M: add black mask with AO Generator")
     logging.info("Ctrl + alt + M: add mask Curvature Generator")
     logging.info("---")
-    logging.info("Ctrl + G: Generate layer from what's visible in Stack")
+    logging.info("Ctrl + Shift + G: Generate layer from what's visible in Stack")
     
 
 

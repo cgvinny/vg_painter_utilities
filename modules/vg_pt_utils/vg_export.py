@@ -59,6 +59,8 @@ class VG_ExportManager:
         # Get the active texture set
         texture_set = textureset.get_active_stack()
         texture_set_name = str(texture_set.material())
+        testUVtiles = textureset.TextureSet.all_uv_tiles(texture_set.material())
+        print(testUVtiles)
 
         
         # Configure the export settings
@@ -81,14 +83,19 @@ class VG_ExportManager:
         
         try:
             # Perform the export
-            export_result = export.export_project_textures(export_config)
+            current_textureset = texture_set.material()
             
-            if export_result.status == export.ExportStatus.Error:
-                print("Error during texture export:", export_result.message)
-                return None
+            if current_textureset.has_uv_tiles():
+                print("UV tiles not supported yet")
             else:
-                print("Export successful!")
-                return export_result
+                export_result = export.export_project_textures(export_config)
+                
+                if export_result.status == export.ExportStatus.Error:
+                    print("Error during texture export:", export_result.message)
+                    return None
+                else:
+                    print("Export successful!")
+                    return export_result
         
         except Exception as e:
             print(f"Error during texture export: {e}")
@@ -130,10 +137,6 @@ class VG_ExportManager:
                         new_layer.set_source(channel_type, texture_resource.identifier())
 
         print("Textures imported and assigned to the new fill layer.")
-        
-       
-
-        
         
         
         
