@@ -18,6 +18,7 @@ from substance_painter import textureset, layerstack, project, resource, logging
 
 
 class VG_StackManager:
+    
     """
     The `VG_StackManager` class provides a set of utilities for managing layers within the active texture stack in Adobe Substance 3D Painter. It allows users to add various types of layers and set active channels, facilitating streamlined layer stack management.
 
@@ -66,25 +67,37 @@ class VG_StackManager:
         """Class Initiaization"""
         
         self._current_stack = None
+        self._layer_selection = None
+        
         if project.is_open():
             self._current_stack = textureset.get_active_stack()
+            self._layer_selection = layerstack.get_selected_nodes(self._current_stack)
 
     @property
     def current_stack(self):
-        return self._current_stack
+        return self._current_stack    
 
     @current_stack.setter
     def current_stack(self, value):
         self._current_stack = value
         
+        
+    @property
+    def layer_selection(self):
+        return self._layer_selection
+   
+    @layer_selection.setter
+    def layer_selection(self, value):
+        self._layer_selection = value
     
+    
+    
+    def refresh_layer_selection(self):
+        self._layer_selection = layerstack.get_selected_nodes(self._current_stack)
     
     
     def add_layer(self, layer_type, active_channels=None, layer_position="Above"):
-        """Add a layer of specified type to the current stack with optional active channels"""
-        
-        
-            
+        """Add a layer of specified type to the current stack with optional active channels"""                    
         
         if self._current_stack is None:
             logging.error("No active stack found")
