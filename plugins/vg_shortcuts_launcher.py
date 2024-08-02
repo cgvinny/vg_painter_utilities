@@ -103,8 +103,10 @@ def on_ctrl_plus_shift_plus_g_shortcut_activated():
     export_preset_name = "PBR Metallic Roughness"
 
     exporter = vg_export.VG_ExportManager(export_path, export_preset_name)
+    #exporter.define_active_channels_export_info()
     exported_textures = exporter.export_active_texture_set()    
     exporter.import_textures_to_layer(exported_textures)
+    
     
 
 ###########################################################    
