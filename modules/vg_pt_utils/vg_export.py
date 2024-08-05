@@ -8,7 +8,10 @@
 
 # Modules Import
 import os
+#import numpy
 from re import split
+
+#from numpy import append
 
 from substance_painter import export, textureset, resource, layerstack
 from vg_pt_utils import vg_layerstack
@@ -78,114 +81,74 @@ class VG_ExportManager:
 
         return textureset_info
 
-    ##############################################################################
-    # Custom export preset & export config definition
-    
-    
-    def define_active_channels_export_info(self):
-
-       # Get Active TextureSet info:
+   
+    def generate_current_channels_maps_export(self):
+    # Get Active TextureSet info:
         current_textureset_info = self.get_textureset_info()
-        # configure export preset
-        export_preset_custom_name = "Active Channels Export"
-        
-        active_channel_export_preset = [{}]
-        
+        raw_channels_list = current_textureset_info["Channels"]
+        channels_names = []
+        current_channels_info = []
 
-        # Configure the export settings
-        custom_export_config = {
-                                    "exportShaderParams": False,
-                                    "exportPath": self.export_path,
-                                    "defaultExportPreset": export_preset_custom_name,
-                                    "exportList":   [
-                                                        {
-                                                            "rootPath": current_textureset_info["Name"]
-                                                        }
-                                                    ],
-                                    "exportParameters": [
-                                                            {"parameters":  {
-                                                                            "dithering": True, 
-                                                                            "paddingAlgorithm": "infinite"
-                                                                            }
-                                                            }
-                                                        ],
-                                    "uvTiles": current_textureset_info["UV Tiles coordinates"],
-                                    "maps":[]
-                                }
-         # Add maps configuration for each active channel
-        for channel in active_channel_export_preset:
-            map_config = {
-                "fileName": f"{current_textureset_info['Name']}_{channel}",
-                "channels": [
-                    {
-                        "destChannel": "R",
-                        "srcChannel": "R",
-                        "srcMapType": "documentMap",
-                        "srcMapName": channel
-                    },
-                    {
-                        "destChannel": "G",
-                        "srcChannel": "G",
-                        "srcMapType": "documentMap",
-                        "srcMapName": channel
-                    },
-                    {
-                        "destChannel": "B",
-                        "srcChannel": "B",
-                        "srcMapType": "documentMap",
-                        "srcMapName": channel
-                    },
-                    {
-                        "destChannel": "A",
-                        "srcChannel": "A",
-                        "srcMapType": "documentMap",
-                        "srcMapName": channel
-                    },
-                    {
-                        "destChannel": "R",
-                        "srcChannel": "R",
-                        "srcMapType": "documentMap",
-                        "srcMapName": channel
-                    },
-                ],
-                "parameters": {
-                    "fileFormat": "png",
-                    "bitDepth": "16",
-                    "dithering": False,
-                    "sizeLog2": 10,
-                    "paddingAlgorithm": "diffusion",
-                    "dilationDistance": 16
+        for element in raw_channels_list:
+            channels_names.append(element.name)
+
+        for channel_name in channels_names:
+            channels_info = []
+            for channel in "RGBA":
+                channels_info.append({
+                    "destChannel": channel,
+                    "srcChannel": channel,
+                    "srcMapType": "DocumentMap",
+                    "srcMapName": channel_name
+                })
+            current_filename = '$mesh_$textureSet_' + channel_name + ".$udim"
+            current_channels_info.append({
+                'fileName': current_filename,
+                'channels': channels_info,
+                'parameters': {
+                    'bitDepth': '8',
+                    'dithering': False,
+                    'fileFormat': 'png'
                 }
-            }
-            custom_export_config["maps"].append(map_config)
-            custom_export_config["maps"]
+            })
 
-    # End custom export preset definition
-    ##############################################################################
+        return current_channels_info
 
-    def export_active_texture_set(self):
-        print("prout")
-        export_preset_url = self.get_export_preset()
 
-        if export_preset_url is None:
-            print("export_preset_url is None")
-            return None
+        
+    
 
+    def generate_export_config(self):
+        #export_preset_ref = self.get_export_preset()
+        export_preset_name = "Current channels Export"
+        
+        current_channels_export_preset = {
+            "name": export_preset_name,
+            "maps": self.generate_current_channels_maps_export()
+        }
+                
         # Get Active TextureSet info:
         current_textureset_info = self.get_textureset_info()
-
+        
         # Configure the export settings
         export_config = {
-            "exportShaderParams": False,
             "exportPath": self.export_path,
-            "defaultExportPreset": export_preset_url,
+            "exportShaderParams": False,
+            "defaultExportPreset": export_preset_name,
+            "exportPresets":[current_channels_export_preset],
             "exportList": [{"rootPath": current_textureset_info["Name"]}],
             "exportParameters": [
                 {"parameters": {"dithering": True, "paddingAlgorithm": "infinite"}}
             ],
             "uvTiles": current_textureset_info["UV Tiles coordinates"],
         }
-       
+        return export_config
+    
+    
+    def export_active_texture_set(self):
+        
+        # Configure the export settings
+        export_config = self.generate_export_config()       
 
         try:
             # Perform the export
