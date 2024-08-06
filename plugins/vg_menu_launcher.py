@@ -102,17 +102,17 @@ def create_menu():
     plugin_menus_widgets.append(vg_utilities_menu)
 
     # Create actions
-    action_new_paint_layer = QtWidgets.QAction("New Paint Layer", vg_utilities_menu)
+    action_new_paint_layer = QtWidgets.QAction("New Paint Layer (Ctrl+P)", vg_utilities_menu)
 
-    action_new_fill_layer_base = QtWidgets.QAction("New Fill Layer with Base Color", vg_utilities_menu)
-    action_new_fill_layer_height = QtWidgets.QAction("New Fill Layer with Height Activated", vg_utilities_menu)
-    action_new_fill_layer_all = QtWidgets.QAction("New Fill Layer with All Channels Activated", vg_utilities_menu)
+    action_new_fill_layer_base = QtWidgets.QAction("New Fill Layer with Base Color    (Ctrl+F)", vg_utilities_menu)
+    action_new_fill_layer_height = QtWidgets.QAction("New Fill Layer with Height    (Ctrl+Alt+F)", vg_utilities_menu)
+    action_new_fill_layer_all = QtWidgets.QAction("New Fill Layer with All Activate Channels   (Ctrl+Shift+F)", vg_utilities_menu)
 
-    action_add_mask = QtWidgets.QAction("Add Mask to Selected Layer", vg_utilities_menu)
-    action_add_ao_mask = QtWidgets.QAction("Add AO Generator Mask", vg_utilities_menu)
-    action_add_curvature_mask = QtWidgets.QAction("Add Curvature Generator Mask", vg_utilities_menu)
+    action_add_mask = QtWidgets.QAction("Add Mask to Selected Layer  (Ctrl+M)", vg_utilities_menu)
+    action_add_ao_mask = QtWidgets.QAction("Add AO Generator Mask   (Ctrl+Shift+M)", vg_utilities_menu)
+    action_add_curvature_mask = QtWidgets.QAction("Add Curvature Generator Mask   (Ctrl+Alt+M)", vg_utilities_menu)
 
-    action_create_layer_from_stack = QtWidgets.QAction("Create New Layer from Visible Stack", vg_utilities_menu)
+    action_create_layer_from_stack = QtWidgets.QAction("Create New Layer from Visible Stack   (Ctrl+Shift+G)", vg_utilities_menu)
 
 
     # Connect actions to functions
