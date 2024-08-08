@@ -16,7 +16,6 @@ Substance 3d Painter.
 from substance_painter import textureset, layerstack, project, resource, logging
 
 
-
 class VG_StackManager:
     
     """
@@ -72,6 +71,8 @@ class VG_StackManager:
         if project.is_open():
             self._current_stack = textureset.get_active_stack()
             self._layer_selection = layerstack.get_selected_nodes(self._current_stack)
+            self._stack_layers = layerstack.get_root_layer_nodes(self._current_stack)
+            self._stack_layers_count = len(self._stack_layers)
 
     @property
     def current_stack(self):
@@ -89,15 +90,35 @@ class VG_StackManager:
     @layer_selection.setter
     def layer_selection(self, value):
         self._layer_selection = value
+        
+    
+    @property
+    def stack_layers(self):
+        return self._stack_layers
+    
+    @property
+    def stack_layers_count(self):
+        return self._stack_layers_count
     
     
     
     def refresh_layer_selection(self):
         self._layer_selection = layerstack.get_selected_nodes(self._current_stack)
+        
+    def refresh_stack_layers(self):
+        self._stack_layers = layerstack.get_root_layer_nodes(self._current_stack)
+        
+    def refresh_stack_layers_count(self):
+        self.refresh_stack_layers()
+        self._stack_layers_count = len(self._stack_layers)
     
     
     def add_layer(self, layer_type, active_channels=None, layer_position="Above"):
-        """Add a layer of specified type to the current stack with optional active channels"""                    
+        """Add a layer of specified type to the current stack with optional active channels"""
+        self.refresh_stack_layers_count()
+        current_layer_count = self._stack_layers_count
+        print(current_layer_count)
+                  
         
         if self._current_stack is None:
             logging.error("No active stack found")
@@ -106,18 +127,24 @@ class VG_StackManager:
             insert_position = None
             selected_layer = layerstack.get_selected_nodes(self._current_stack)
             
-            if layer_position == "Above":
+            if current_layer_count == 0:
+                # Insert at the top of the given textureset layer stack
+                insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
+                
+            elif layer_position == "Above":
                 # Insert a layer above new_layer                
                 insert_position = layerstack.InsertPosition.above_node(selected_layer[0])
+                
             elif layer_position == "On Top":
               # Insert at the top of the given textureset layer stack
                 insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
+                
             else:
                 logging.error("layer_position parameter must be 'Above' or 'Below'")
             
             
-            if len(selected_layer) ==0:
-                insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
+            # if len(selected_layer) ==0:
+            #     insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
               
                
             new_layer = None
