@@ -29,7 +29,7 @@ plugin_menus_widgets = []
 
 
 
-######## FILL LAYER FUNCTIONS (F) ########
+######## FILL LAYER FUNCTIONS ########
 
 
 def new_fill_layer_base():
@@ -50,7 +50,7 @@ def new_fill_layer_all():
     
     
 
-######## PAINT LAYER FUNCTIONS (P) ########    
+######## PAINT LAYER FUNCTIONS ########    
 
 def new_paint_layer():
     stack_manager = vg_layerstack.VG_StackManager()
@@ -59,7 +59,7 @@ def new_paint_layer():
     
     
     
-######## MASK FUNCTIONS (M) ########
+######## MASK FUNCTIONS ########
 
 def add_mask():
     stack_manager = vg_layerstack.VG_StackManager()
@@ -73,7 +73,10 @@ def add_curvature_mask():
     stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_black_mask_with_curvature_generator()
 
-###########################################################    
+
+
+
+################ GENERATE CONTENT FROM STACK #######################    
 
 
 def create_layer_from_stack():
@@ -82,9 +85,22 @@ def create_layer_from_stack():
     export_preset_name = "PBR Metallic Roughness"
 
     exporter = vg_export.VG_ExportManager(export_path, export_preset_name)
-    #exporter.define_active_channels_export_info()
     exported_textures = exporter.export_active_texture_set()    
     exporter.import_textures_to_layer(exported_textures)
+    
+    
+def flatten_stack():
+    export_path = os.path.join(os.getenv('USERPROFILE'), 'Documents/Adobe/Adobe Substance 3D Painter/export')
+
+    export_preset_name = "PBR Metallic Roughness"
+
+    exporter = vg_export.VG_ExportManager(export_path, export_preset_name)
+    stack_manager = vg_layerstack.VG_StackManager()
+    exported_textures = exporter.export_active_texture_set()
+    stack_manager.delete_stack_content()
+    exporter.import_textures_to_layer(exported_textures)
+    
+    
     
     
 
@@ -113,6 +129,7 @@ def create_menu():
     action_add_curvature_mask = QtWidgets.QAction("Add Curvature Generator Mask   (Ctrl+Alt+M)", vg_utilities_menu)
 
     action_create_layer_from_stack = QtWidgets.QAction("Create New Layer from Visible Stack   (Ctrl+Shift+G)", vg_utilities_menu)
+    action_flatten_stack = QtWidgets.QAction("Flatten Stack", vg_utilities_menu)
 
 
     # Connect actions to functions
@@ -124,6 +141,7 @@ def create_menu():
     action_add_ao_mask.triggered.connect(add_ao_mask)
     action_add_curvature_mask.triggered.connect(add_curvature_mask)
     action_create_layer_from_stack.triggered.connect(create_layer_from_stack)
+    action_flatten_stack.triggered.connect(flatten_stack)
 
 
     # Add actions to the menu
@@ -138,6 +156,7 @@ def create_menu():
     vg_utilities_menu.addAction(action_add_curvature_mask)
     vg_utilities_menu.addSeparator()
     vg_utilities_menu.addAction(action_create_layer_from_stack)
+    vg_utilities_menu.addAction(action_flatten_stack)
     
     
 

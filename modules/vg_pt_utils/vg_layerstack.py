@@ -248,3 +248,12 @@ class VG_StackManager:
             for selectedLayer in current_layer:
                 insertion_position = layerstack.InsertPosition.inside_node(selectedLayer, layerstack.NodeStack.Mask)
                 layerstack.insert_generator_effect(insertion_position, generator_resource.identifier())
+                
+                
+    
+    #Delete Full Stack Content
+    def delete_stack_content(self):
+        current_layers = self.stack_layers
+        for layer in current_layers:
+            layerstack.delete_node(layer)
+            
