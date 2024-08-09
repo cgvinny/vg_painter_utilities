@@ -8,10 +8,6 @@
 
 # Modules Import
 import os
-#import numpy
-from re import split
-
-#from numpy import append
 
 from substance_painter import export, textureset, resource, layerstack
 from vg_pt_utils import vg_layerstack
@@ -38,20 +34,32 @@ class VG_ExportManager:
     import_textures_to_layer(textures):
         Imports the exported textures into a new fill layer and assigns them to the appropriate channels.
     """
+    
+    __author__ = "Vincent GAULT - Adobe"
 
-    def __init__(self, export_path, export_preset_name):
+    #Defining default variables
+    default_export_path = os.path.join(os.getenv("USERPROFILE"), "Documents", "Adobe", "Adobe Substance 3D Painter", "export")
+    
+    
+
+    def __init__(self, export_path = default_export_path, export_preset_name = ""):
         self.export_path = export_path  # Define the export path
         self.export_preset_name = export_preset_name  # Define the export preset name
 
     def get_export_preset(self):
-        # Obtain the URL of the export preset
+        """
+            Obtains the URL of the specified export preset.
+    
+            Returns:
+            str or None: The URL of the export preset, or None if an error occurs.
+        """
         try:
             export_preset = resource.ResourceID(
                 context="starter_assets", name=self.export_preset_name
             )
             return export_preset.url()
 
-        except Exception as e:
+        except resource.ResourceError as e:
             print(f"Error obtaining export preset: {e}")
             return None
 
@@ -92,15 +100,16 @@ class VG_ExportManager:
         for element in raw_channels_list:
             channels_names.append(element.name)
 
-        for channel_name in channels_names:
-            channels_info = []
-            for channel in "RGBA":
-                channels_info.append({
-                    "destChannel": channel,
-                    "srcChannel": channel,
-                    "srcMapType": "DocumentMap",
-                    "srcMapName": channel_name
-                })
+        for channel_name in channels_names:            
+            channels_info = [
+                                {
+                                    "destChannel": channel,
+                                    "srcChannel": channel,
+                                    "srcMapType": "DocumentMap",
+                                    "srcMapName": channel_name
+                                } for channel in "RGBA"
+                            ]
+                
             current_filename = '$mesh_$textureSet_' + channel_name + ".$udim"
             current_channels_info.append({
                 'fileName': current_filename,
@@ -148,7 +157,8 @@ class VG_ExportManager:
     def export_active_texture_set(self):
         
         # Configure the export settings
-        export_config = self.generate_export_config()       
+        export_config = self.generate_export_config()
+        
 
         try:
             # Perform the export
@@ -158,16 +168,20 @@ class VG_ExportManager:
                 print("Error during texture export:", export_result.message)
                 return None
             else:
-                print("Export successful!")
+                print("Export successful!")    
                 return export_result
 
         except Exception as e:
             print(f"Error during texture export: {e}")
             return None
+        
+        
+        
 
-    def import_textures_to_layer(self, textures):
+    def import_textures_to_layer(self, textures_to_import):
 
-        if not textures:
+        
+        if not textures_to_import:
             print("No textures to import.")
             return
 
@@ -181,8 +195,8 @@ class VG_ExportManager:
 
         # Import and assign textures to the new fill layer
         texture_resource = None
-        for texture_list_key in textures.textures.keys():
-            current_texture_list = textures.textures[texture_list_key]
+        for texture_list_key in textures_to_import.textures.keys():
+            current_texture_list = textures_to_import.textures[texture_list_key]
 
             for texture_path in current_texture_list:
                 texture_resource = resource.import_project_resource(
@@ -209,14 +223,14 @@ class VG_ExportManager:
         print("Textures imported and assigned to the new fill layer.")
 
 
-if __name__ == "__main__":
-    export_path = os.path.join(
-        os.getenv("USERPROFILE"), "Documents/Adobe/Adobe Substance 3D Painter/export"
-    )
-    export_preset_name = "PBR Metallic Roughness"
+if __name__ == "__main__":    
 
-    exporter = VG_ExportManager(export_path, export_preset_name)
+    exporter = VG_ExportManager()
     exported_textures = exporter.export_active_texture_set()
 
     if exported_textures:
         exporter.import_textures_to_layer(exported_textures)
+
+
+
+

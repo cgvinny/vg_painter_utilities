@@ -10,6 +10,8 @@
 This module contains different utilities related to the layer stack in
 Substance 3d Painter.
 """
+__author__ = "Vincent GAULT - Adobe"
+
 
 
 # Modules Import
@@ -67,12 +69,12 @@ class VG_StackManager:
         
         self._current_stack = None
         self._layer_selection = None
+        self._stack_layers = None
+        self._stack_layers_count = None
         
         if project.is_open():
             self._current_stack = textureset.get_active_stack()
-            self._layer_selection = layerstack.get_selected_nodes(self._current_stack)
-            self._stack_layers = layerstack.get_root_layer_nodes(self._current_stack)
-            self._stack_layers_count = len(self._stack_layers)
+            self._layer_selection = layerstack.get_selected_nodes(self._current_stack)            
 
     @property
     def current_stack(self):
@@ -94,34 +96,39 @@ class VG_StackManager:
     
     @property
     def stack_layers(self):
+        if self._stack_layers is None:
+            self._stack_layers = layerstack.get_root_layer_nodes(self._current_stack)
         return self._stack_layers
     
     @property
     def stack_layers_count(self):
+        if self._stack_layers_count is None:
+            self._stack_layers_count = len(self.stack_layers)
         return self._stack_layers_count
     
     
     
     def refresh_layer_selection(self):
-        self._layer_selection = layerstack.get_selected_nodes(self._current_stack)
+        self.layer_selection = layerstack.get_selected_nodes(self.current_stack)      
+
         
-    def refresh_stack_layers(self):
-        self._stack_layers = layerstack.get_root_layer_nodes(self._current_stack)
         
-    def refresh_stack_layers_count(self):
-        self.refresh_stack_layers()
-        self._stack_layers_count = len(self._stack_layers)
+        
     
     
     def add_layer(self, layer_type, active_channels=None, layer_position="Above"):
         """Add a layer of specified type to the current stack with optional active channels"""
-        self.refresh_stack_layers_count()
+        
+        if layer_position not in ["Above", "On Top"]:
+            logging.error("layer_position parameter must be 'Above' or 'On Top'")
+            return None        
+        
         current_layer_count = self._stack_layers_count
-        print(current_layer_count)
                   
         
         if self._current_stack is None:
             logging.error("No active stack found")
+            return None
         
         else:
             insert_position = None
@@ -139,17 +146,14 @@ class VG_StackManager:
               # Insert at the top of the given textureset layer stack
                 insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
                 
-            else:
-                logging.error("layer_position parameter must be 'Above' or 'Below'")
+            
             
             
             # if len(selected_layer) ==0:
             #     insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
               
                
-            new_layer = None
-            
-            
+            new_layer = None           
             
             
             if layer_type == 'fill':                
@@ -174,18 +178,11 @@ class VG_StackManager:
 
             # Select newly created layer
             layerstack.set_selected_nodes([new_layer])
-            return new_layer
+            
+            return new_layer if new_layer else None
 
     
-    
-    
-    # def set_active_channels(self, layer, channels):
-    #     """Set active channels for a given layer"""
-    #     layer.active_channels = {getattr(textureset.ChannelType, channel) for channel in channels}
-
-
-
-    
+        
     
     
     def add_mask(self, mask_bkg_color=None):
@@ -229,13 +226,17 @@ class VG_StackManager:
     def add_black_mask_with_ao_generator(self):
         """Adds a black mask with an ambient occlusion generator to the currently selected layer."""
         self.add_mask('Black')
+        
         if self.current_stack:
             current_layer = layerstack.get_selected_nodes(self.current_stack)
             generator_resource = resource.search("s:starterassets u:generator n:Ambient Occlusion")[0]
             
-            for selectedLayer in current_layer:
-                insertion_position = layerstack.InsertPosition.inside_node(selectedLayer, layerstack.NodeStack.Mask)
-                layerstack.insert_generator_effect(insertion_position, generator_resource.identifier())
+            insertion_positions = [
+                layerstack.InsertPosition.inside_node(layer, layerstack.NodeStack.Mask)
+                for layer in current_layer
+            ]
+            for pos in insertion_positions:
+                layerstack.insert_generator_effect(pos, generator_resource.identifier())
                 
 
     def add_black_mask_with_curvature_generator(self):
@@ -245,9 +246,12 @@ class VG_StackManager:
             current_layer = layerstack.get_selected_nodes(self.current_stack)
             generator_resource = resource.search("s:starterassets u:generator n:Curvature")[0]
             
-            for selectedLayer in current_layer:
-                insertion_position = layerstack.InsertPosition.inside_node(selectedLayer, layerstack.NodeStack.Mask)
-                layerstack.insert_generator_effect(insertion_position, generator_resource.identifier())
+            insertion_positions = [
+                layerstack.InsertPosition.inside_node(layer, layerstack.NodeStack.Mask)
+                for layer in current_layer
+            ]
+            for pos in insertion_positions:
+                layerstack.insert_generator_effect(pos, generator_resource.identifier())
                 
                 
     

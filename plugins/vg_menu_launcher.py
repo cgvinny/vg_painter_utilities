@@ -1,19 +1,15 @@
 ###############################################################################
-
-# This script will create a menu to host different tools for substance 3D Painter
+# This script creates a menu to host different tools for Substance 3D Painter
 # ___________________
 # Copyright 2024 Vincent GAULT - Adobe
 # All Rights Reserved.
-
 ###############################################################################
-""""This module is used will create a menu to host different tools for Substance Painter.
 
- """
-
+"""
+This module creates a menu to host various tools for Substance Painter.
+"""
 
 __author__ = "Vincent GAULT - Adobe"
-
-
 
 # Modules import
 from PySide2 import QtWidgets
@@ -23,92 +19,70 @@ import os
 from substance_painter import ui, logging
 from vg_pt_utils import vg_export, vg_layerstack
 
-
 plugin_menus_widgets = []
-"""Keeps track of added ui elements for cleanup"""
-
-
+"""Keeps track of added UI elements for cleanup."""
 
 ######## FILL LAYER FUNCTIONS ########
 
-
 def new_fill_layer_base():
+    """Create a new fill layer with Base Color activated."""
     stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_layer('fill', active_channels=["BaseColor"])
 
-
 def new_fill_layer_height():
+    """Create a new fill layer with Height channel activated."""
     stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_layer('fill', active_channels=["Height"])
-    
 
 def new_fill_layer_all():
-    stack_manager = vg_layerstack.VG_StackManager()    
+    """Create a new fill layer with all channels activated."""
+    stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_layer('fill')
-    
-    
-    
-    
 
 ######## PAINT LAYER FUNCTIONS ########    
 
 def new_paint_layer():
+    """Create a new paint layer."""
     stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_layer('paint')
-    
-    
-    
-    
+
 ######## MASK FUNCTIONS ########
 
 def add_mask():
+    """Add a black mask to the selected layer."""
     stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_mask()
-    
+
 def add_ao_mask():
+    """Add a black mask with AO Generator."""
     stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_black_mask_with_ao_generator()
-    
+
 def add_curvature_mask():
+    """Add a black mask with Curvature Generator."""
     stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_black_mask_with_curvature_generator()
 
-
-
-
 ################ GENERATE CONTENT FROM STACK #######################    
 
-
 def create_layer_from_stack():
-    export_path = os.path.join(os.getenv('USERPROFILE'), 'Documents/Adobe/Adobe Substance 3D Painter/export')
+    """Generate a layer from the visible content in the stack."""
+    exporter_manager = vg_export.VG_ExportManager()
+    exported_textures = exporter_manager.export_active_texture_set()
+    exporter_manager.import_textures_to_layer(exported_textures)
 
-    export_preset_name = "PBR Metallic Roughness"
-
-    exporter = vg_export.VG_ExportManager(export_path, export_preset_name)
-    exported_textures = exporter.export_active_texture_set()    
-    exporter.import_textures_to_layer(exported_textures)
-    
-    
 def flatten_stack():
-    export_path = os.path.join(os.getenv('USERPROFILE'), 'Documents/Adobe/Adobe Substance 3D Painter/export')
-
-    export_preset_name = "PBR Metallic Roughness"
-
-    exporter = vg_export.VG_ExportManager(export_path, export_preset_name)
+    """Flatten the stack by exporting and importing textures."""
+    exporter_manager = vg_export.VG_ExportManager()
     stack_manager = vg_layerstack.VG_StackManager()
-    exported_textures = exporter.export_active_texture_set()
+    exported_textures = exporter_manager.export_active_texture_set()
     stack_manager.delete_stack_content()
-    exporter.import_textures_to_layer(exported_textures)
-    
-    
-    
-    
+    exporter_manager.import_textures_to_layer(exported_textures)
 
 ########################################################### 
 
-
 def create_menu():    
-
+    """Create and populate the menu with actions."""
     # Get the main window
     main_window = ui.get_main_window()    
 
@@ -118,78 +92,43 @@ def create_menu():
     plugin_menus_widgets.append(vg_utilities_menu)
 
     # Create actions
-    action_new_paint_layer = QtWidgets.QAction("New Paint Layer (Ctrl+P)", vg_utilities_menu)
+    actions = {
+        "New Paint Layer (Ctrl+P)": new_paint_layer,
+        "New Fill Layer with Base Color (Ctrl+F)": new_fill_layer_base,
+        "New Fill Layer with Height (Ctrl+Alt+F)": new_fill_layer_height,
+        "New Fill Layer with All Channels (Ctrl+Shift+F)": new_fill_layer_all,
+        "Add Mask to Selected Layer (Ctrl+M)": add_mask,
+        "Add AO Generator Mask (Ctrl+Shift+M)": add_ao_mask,
+        "Add Curvature Generator Mask (Ctrl+Alt+M)": add_curvature_mask,
+        "Create New Layer from Visible Stack (Ctrl+Shift+G)": create_layer_from_stack,
+        "Flatten Stack": flatten_stack,
+    }
 
-    action_new_fill_layer_base = QtWidgets.QAction("New Fill Layer with Base Color    (Ctrl+F)", vg_utilities_menu)
-    action_new_fill_layer_height = QtWidgets.QAction("New Fill Layer with Height    (Ctrl+Alt+F)", vg_utilities_menu)
-    action_new_fill_layer_all = QtWidgets.QAction("New Fill Layer with All Activate Channels   (Ctrl+Shift+F)", vg_utilities_menu)
-
-    action_add_mask = QtWidgets.QAction("Add Mask to Selected Layer  (Ctrl+M)", vg_utilities_menu)
-    action_add_ao_mask = QtWidgets.QAction("Add AO Generator Mask   (Ctrl+Shift+M)", vg_utilities_menu)
-    action_add_curvature_mask = QtWidgets.QAction("Add Curvature Generator Mask   (Ctrl+Alt+M)", vg_utilities_menu)
-
-    action_create_layer_from_stack = QtWidgets.QAction("Create New Layer from Visible Stack   (Ctrl+Shift+G)", vg_utilities_menu)
-    action_flatten_stack = QtWidgets.QAction("Flatten Stack", vg_utilities_menu)
-
-
-    # Connect actions to functions
-    action_new_paint_layer.triggered.connect(new_paint_layer)
-    action_new_fill_layer_base.triggered.connect(new_fill_layer_base)
-    action_new_fill_layer_height.triggered.connect(new_fill_layer_height)
-    action_new_fill_layer_all.triggered.connect(new_fill_layer_all)
-    action_add_mask.triggered.connect(add_mask)
-    action_add_ao_mask.triggered.connect(add_ao_mask)
-    action_add_curvature_mask.triggered.connect(add_curvature_mask)
-    action_create_layer_from_stack.triggered.connect(create_layer_from_stack)
-    action_flatten_stack.triggered.connect(flatten_stack)
-
-
-    # Add actions to the menu
-    vg_utilities_menu.addAction(action_new_paint_layer)
-    vg_utilities_menu.addSeparator()
-    vg_utilities_menu.addAction(action_new_fill_layer_base)
-    vg_utilities_menu.addAction(action_new_fill_layer_height)
-    vg_utilities_menu.addAction(action_new_fill_layer_all)
-    
-    vg_utilities_menu.addAction(action_add_mask)
-    vg_utilities_menu.addAction(action_add_ao_mask)
-    vg_utilities_menu.addAction(action_add_curvature_mask)
-    vg_utilities_menu.addSeparator()
-    vg_utilities_menu.addAction(action_create_layer_from_stack)
-    vg_utilities_menu.addAction(action_flatten_stack)
-    
-    
-
+    for text, func in actions.items():
+        action = QtWidgets.QAction(text, vg_utilities_menu)
+        action.triggered.connect(func)
+        vg_utilities_menu.addAction(action)
 
 def start_plugin():
-    """This function is called when the plugin is started."""
+    """Called when the plugin is started."""
     create_menu()
-    logging.info("Vg Menu Activated") 
+    logging.info("VG Menu Activated") 
     
-    
-    
-    
-
 
 def close_plugin():
-    """This function is called when the plugin is stopped."""
-    
-    # We need to remove all added widgets from the UI.
+    """Called when the plugin is stopped."""
+    # Remove all added widgets from the UI.
     for widget in plugin_menus_widgets:
         ui.delete_ui_element(widget)
-        
     plugin_menus_widgets.clear()
-    logging.info("Vg Menu deactivated")  
-
+    logging.info("VG Menu deactivated")  
 
 def reload_plugin():
+    """Reload plugin modules."""
     importlib.reload(vg_layerstack)
     importlib.reload(vg_export)
-    logging.info("Vg Menu Reloaded") 
-
-    
 
 if __name__ == "__main__":
     importlib.reload(vg_layerstack)
-    importlib.reload(vg_export)  
+    importlib.reload(vg_export)
     start_plugin()
