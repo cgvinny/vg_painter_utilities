@@ -120,6 +120,21 @@ def on_ctrl_plus_shift_plus_g_shortcut_activated():
         exporter_manager.import_textures_to_layer(exported_textures)
     except Exception as e:
         logging.error(f"Failed to generate layer from visible content: {e}")
+        
+############## CREATE REFERENCE POINT LAYER ####################### 
+
+def on_ctrl_plus_r_shortcut_activated():
+    stack_manager = vg_layerstack.VG_StackManager()
+    stack_manager.generate_ref_point_layer()    
+    
+    
+    
+##################################################       
+        
+        
+        
+        
+        
 
 def define_shortcuts():
     """Defines the various keyboard shortcuts."""
@@ -135,6 +150,7 @@ def define_shortcuts():
         QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_M: on_ctrl_plus_shift_plus_m_shortcut_activated,
         QtCore.Qt.CTRL + QtCore.Qt.ALT + QtCore.Qt.Key_M: on_ctrl_plus_alt_plus_m_shortcut_activated,
         QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_G: on_ctrl_plus_shift_plus_g_shortcut_activated,
+        QtCore.Qt.CTRL + QtCore.Qt.Key_R: on_ctrl_plus_r_shortcut_activated,
     }
 
     for key_sequence, function in shortcuts.items():
@@ -158,6 +174,7 @@ def start_plugin():
     logging.info("Ctrl + Alt + M: Add black mask with Curvature Generator")
     logging.info("---")
     logging.info("Ctrl + Shift + G: Generate layer from what's visible in Stack")
+    logging.info("Ctrl + R: Create reference Point Layer")
 
 def close_plugin():
     """This function is called when the plugin is stopped."""

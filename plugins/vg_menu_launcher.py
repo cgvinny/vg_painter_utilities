@@ -63,6 +63,9 @@ def add_curvature_mask():
     stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_black_mask_with_curvature_generator()
 
+
+
+
 ################ GENERATE CONTENT FROM STACK #######################    
 
 def create_layer_from_stack():
@@ -78,6 +81,18 @@ def flatten_stack():
     exported_textures = exporter_manager.export_active_texture_set()
     stack_manager.delete_stack_content()
     exporter_manager.import_textures_to_layer(exported_textures)
+
+
+
+
+############## CREATE REFERENCE POINT LAYER ####################### 
+
+def create_ref_point_layer():
+    """Create a reference point layer"""
+    stack_manager = vg_layerstack.VG_StackManager()
+    stack_manager.generate_ref_point_layer()
+
+
 
 ########################################################### 
 
@@ -102,12 +117,14 @@ def create_menu():
         "Add Curvature Generator Mask (Ctrl+Alt+M)": add_curvature_mask,
         "Create New Layer from Visible Stack (Ctrl+Shift+G)": create_layer_from_stack,
         "Flatten Stack": flatten_stack,
+        "Create Reference Point Layer": create_ref_point_layer,
     }
 
     for text, func in actions.items():
         action = QtWidgets.QAction(text, vg_utilities_menu)
         action.triggered.connect(func)
         vg_utilities_menu.addAction(action)
+
 
 def start_plugin():
     """Called when the plugin is started."""
