@@ -63,7 +63,7 @@ class VG_StackManager:
     """
     
     
-
+    # Class initialization
     def __init__(self):
         """Class Initiaization"""
         
@@ -107,15 +107,16 @@ class VG_StackManager:
         return self._stack_layers_count
     
     
+    #################################""
+    
+    #Class Functions
     
     def refresh_layer_selection(self):
-        self.layer_selection = layerstack.get_selected_nodes(self.current_stack)      
-
-        
+        self.layer_selection = layerstack.get_selected_nodes(self.current_stack)    
         
         
     
-    
+    #General function to simplfy layer creation
     def add_layer(self, layer_type, active_channels=None, layer_position="Above"):
         """Add a layer of specified type to the current stack with optional active channels"""
         
@@ -146,11 +147,6 @@ class VG_StackManager:
               # Insert at the top of the given textureset layer stack
                 insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
                 
-            
-            
-            
-            # if len(selected_layer) ==0:
-            #     insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
               
                
             new_layer = None           
@@ -180,11 +176,9 @@ class VG_StackManager:
             layerstack.set_selected_nodes([new_layer])
             
             return new_layer if new_layer else None
-
+ 
     
-        
-    
-    
+    #General function to create mask
     def add_mask(self, mask_bkg_color=None):
         """Adds a mask to the currently selected layer. 
         - If mask_bkg_color is specified, it applies the specified color (Black or White).
@@ -260,4 +254,47 @@ class VG_StackManager:
         current_layers = self.stack_layers
         for layer in current_layers:
             layerstack.delete_node(layer)
+            
+            
+    
+    def generate_ref_point_layer(self):
+        
+        base_name = "REF POINT LAYER"        
+        all_nodes = layerstack.get_root_layer_nodes(self.current_stack)
+        print(all_nodes)
+
+       # Initialize the counter
+        ref_point_count = 1
+
+        # Loop through all nodes and count those that start with "REF POINT LAYER"
+        for node in all_nodes:
+            print(node.get_type())
+            if node.get_name().startswith(base_name):
+                ref_point_count += 1
+            
+            node_type = node.get_type()
+            if node_type== layerstack.NodeType.GroupLayer:
+                sublayers = node.sub_layers()
+                for sublayer in sublayers:
+                    if sublayer.get_name().startswith(base_name):
+                        ref_point_count += 1
+                    
+
+        print(f"Number of layers starting with '{base_name}': {ref_point_count}")            
+        ref_point_name = f"{base_name} ({ref_point_count})"    
+
+        # Create the layer with a unique name
+        ref_point_layer = self.add_layer("paint", layer_position="Above")
+        ref_point_layer.set_name(ref_point_name)
+
+        # Set all layer channels to "Passthrough" blending mode
+        for new_layer_channel in ref_point_layer.active_channels:
+            normal_blending = layerstack.BlendingMode(25)
+            ref_point_layer.set_blending_mode(normal_blending, new_layer_channel)
+
+        insert_position = layerstack.InsertPosition.inside_node(ref_point_layer, layerstack.NodeStack.Content)
+        layerstack.insert_anchor_point_effect(insert_position, ref_point_name)
+
+
+        
             
