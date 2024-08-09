@@ -8,6 +8,7 @@
 
 # Modules Import
 import os
+import inspect
 
 from substance_painter import export, textureset, resource, layerstack
 from vg_pt_utils import vg_layerstack
@@ -190,8 +191,15 @@ class VG_ExportManager:
         new_layer = current_stack_manager.add_layer("fill", layer_position="On Top")
         new_layer.set_name("Stack layer")
         new_channel_set = new_layer.active_channels
-        new_channel_set.remove(layerstack.ChannelType.Normal)
         new_layer.active_channels = set(new_channel_set)
+        
+        
+        #Switching all layer channels to "Normal" blending mode
+        for new_layer_channel in new_layer.active_channels:
+            normal_blending = layerstack.BlendingMode(2)
+            new_layer.set_blending_mode(normal_blending, new_layer_channel)
+            
+            
 
         # Import and assign textures to the new fill layer
         texture_resource = None
@@ -212,13 +220,13 @@ class VG_ExportManager:
                     ]
                     channel_type_string = channel_type_string.split(".")[0]
 
-                    if channel_type_string != "Normal":
-                        channel_type = getattr(
-                            layerstack.ChannelType, channel_type_string
-                        )
-                        new_layer.set_source(
-                            channel_type, texture_resource.identifier()
-                        )
+                    #if channel_type_string != "Normal":
+                    channel_type = getattr(
+                        layerstack.ChannelType, channel_type_string
+                    )
+                    new_layer.set_source(
+                        channel_type, texture_resource.identifier()
+                    )
 
         print("Textures imported and assigned to the new fill layer.")
 
