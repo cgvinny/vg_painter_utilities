@@ -25,6 +25,10 @@ Installation and details in this [https://youtu.be/KjRgUkQnXDk ](video) here
 
 Once activated, The `VG shortcuts launcher` plugin will add a collection of shorcuts to Substance 3D Painter
 
+***VG Menu Launcher***
+
+Once activated, a new "VG Utilities" will be added to the top bar, giving access to the different tools. 
+
 ### Activation 
 In Substance 3D Painter; go to the "Python" top menu and reload the plugins folder: "vg_shortcuts_launcher" should be present
 
