@@ -63,6 +63,11 @@ def add_curvature_mask():
     stack_manager = vg_layerstack.VG_StackManager()
     stack_manager.add_black_mask_with_curvature_generator()
 
+def add_mask_with_fill_effect():
+    """Add a mask with a fill effect."""
+    stack_manager = vg_layerstack.VG_StackManager()
+    stack_manager.add_mask_with_fill()
+
 
 
 
@@ -115,6 +120,7 @@ def create_menu():
         "Add Mask to Selected Layer (Ctrl+M)": add_mask,
         "Add AO Generator Mask (Ctrl+Shift+M)": add_ao_mask,
         "Add Curvature Generator Mask (Ctrl+Alt+M)": add_curvature_mask,
+        "Add Mask with Fill Effect": add_mask_with_fill_effect,
         "Create New Layer from Visible Stack (Ctrl+Shift+G)": create_layer_from_stack,
         "Flatten Stack": flatten_stack,
         "Create Reference Point Layer": create_ref_point_layer,

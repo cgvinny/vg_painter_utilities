@@ -46,6 +46,8 @@ In Substance 3D Painter; go to the "Python" top menu and reload the plugins fold
 ---
 `Ctrl + M`: add mask to selected layer. If a mask is already present, it will switch it from black to white, or from white to black
 
+`Shift + M`: add mask with a fill effect to selected layer. If a mask is already present, it will switch it from black to white, or from white to black
+
 `Ctrl + Shift + M`: add black mask with AO Generator
 
 `Ctrl + alt + M`: add black mask Curvature Generator
