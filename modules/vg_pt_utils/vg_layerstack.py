@@ -15,7 +15,6 @@ __author__ = "Vincent GAULT - Adobe"
 
 
 # Modules Import
-from cgitb import grey
 from substance_painter import textureset, layerstack, project, resource, logging, colormanagement
 
 

@@ -8,7 +8,6 @@
 
 # Modules Import
 import os
-import inspect
 
 from substance_painter import export, textureset, resource, layerstack
 from vg_pt_utils import vg_layerstack
@@ -194,8 +193,7 @@ class VG_ExportManager:
         new_layer = current_stack_manager.add_layer("fill", layer_position="On Top")
         new_layer.set_name("Stack layer")
         new_channel_set = new_layer.active_channels
-        new_layer.active_channels = set(new_channel_set)
-        
+        new_layer.active_channels = set(new_channel_set)        
         
         #Switching all layer channels to "Normal" blending mode
         for new_layer_channel in new_layer.active_channels:
@@ -206,30 +204,23 @@ class VG_ExportManager:
 
         # Import and assign textures to the new fill layer
         texture_resource = None
+        
         for texture_list_key in textures_to_import.textures.keys():
             current_texture_list = textures_to_import.textures[texture_list_key]
 
             for texture_path in current_texture_list:
-                texture_resource = resource.import_project_resource(
-                    texture_path, resource.Usage.TEXTURE
-                )
+                texture_resource = resource.import_project_resource(texture_path, resource.Usage.TEXTURE)
 
                 # Get the target channel type
                 last_underscore_index = texture_path.rfind("_")
                 extension_index = texture_path.rfind(".png")
                 if last_underscore_index != -1 and extension_index != -1:
-                    channel_type_string = texture_path[
-                        last_underscore_index + 1 : extension_index
-                    ]
+                    channel_type_string = texture_path[last_underscore_index + 1 : extension_index]
                     channel_type_string = channel_type_string.split(".")[0]
 
                     #if channel_type_string != "Normal":
-                    channel_type = getattr(
-                        layerstack.ChannelType, channel_type_string
-                    )
-                    new_layer.set_source(
-                        channel_type, texture_resource.identifier()
-                    )
+                    channel_type = getattr(layerstack.ChannelType, channel_type_string)
+                    new_layer.set_source(channel_type, texture_resource.identifier())
 
         print("Textures imported and assigned to the new fill layer.")
 

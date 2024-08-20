@@ -101,6 +101,8 @@ def create_ref_point_layer():
 
 ########################################################### 
 
+from PySide2.QtGui import QKeySequence
+
 def create_menu():    
     """Create and populate the menu with actions."""
     # Get the main window
@@ -111,25 +113,39 @@ def create_menu():
     ui.add_menu(vg_utilities_menu)
     plugin_menus_widgets.append(vg_utilities_menu)
 
-    # Create actions
-    actions = {
-        "New Paint Layer (Ctrl+P)": new_paint_layer,
-        "New Fill Layer with Base Color (Ctrl+F)": new_fill_layer_base,
-        "New Fill Layer with Height (Ctrl+Alt+F)": new_fill_layer_height,
-        "New Fill Layer with All Channels (Ctrl+Shift+F)": new_fill_layer_all,
-        "Add Mask to Selected Layer (Ctrl+M)": add_mask,
-        "Add AO Generator Mask (Ctrl+Shift+M)": add_ao_mask,
-        "Add Curvature Generator Mask (Ctrl+Alt+M)": add_curvature_mask,
-        "Add Mask with Fill Effect (shift+M)": add_mask_with_fill_effect,
-        "Create New Layer from Visible Stack (Ctrl+Shift+G)": create_layer_from_stack,
-        "Flatten Stack": flatten_stack,
-        "Create Reference Point Layer": create_ref_point_layer,
-    }
+    # Define actions, shortcuts, and separators
+    actions_with_separators = [
+        ("New Paint Layer", new_paint_layer, "Ctrl+P"),
+        None,  # Separator
+        ("New Fill Layer with Base Color", new_fill_layer_base, "Ctrl+F"),
+        ("New Fill Layer with Height", new_fill_layer_height, "Ctrl+Alt+F"),
+        ("New Fill Layer with All Channels", new_fill_layer_all, "Ctrl+Shift+F"),
+        None,  # Separator
+        ("Add Mask to Selected Layer", add_mask, "Ctrl+M"),
+        ("Add Mask with Fill Effect", add_mask_with_fill_effect, "Shift+M"),
+        ("Add Mask with AO Generator", add_ao_mask, "Ctrl+Shift+M"),
+        ("Add Mask with Curvature Generator", add_curvature_mask, "Ctrl+Alt+M"),
+        None,  # Separator
+        ("Create New Layer from Visible Stack", create_layer_from_stack, "Ctrl+Shift+G"),
+        ("Flatten Stack", flatten_stack, None),
+        None,  # Separator
+        ("Create Reference Point Layer", create_ref_point_layer, "Ctrl+R"),
+        None,  # Separator
+        #("Settings", open_settings_window, None)  # Settings button
+    ]
 
-    for text, func in actions.items():
-        action = QtWidgets.QAction(text, vg_utilities_menu)
-        action.triggered.connect(func)
-        vg_utilities_menu.addAction(action)
+    # Add actions and separators to the menu
+    for item in actions_with_separators:
+        if item is None:
+            vg_utilities_menu.addSeparator()
+        else:
+            text, func, shortcut = item
+            action = QtWidgets.QAction(text, vg_utilities_menu)
+            action.triggered.connect(func)
+            if shortcut:
+                action.setShortcut(QKeySequence(shortcut))
+            vg_utilities_menu.addAction(action)
+
 
 
 def start_plugin():
