@@ -39,7 +39,10 @@ class VG_ExportManager:
     __author__ = "Vincent GAULT - Adobe"
 
     #Defining default variables
-    default_export_path = os.path.join(os.getenv("USERPROFILE"), "Documents", "Adobe", "Adobe Substance 3D Painter", "export")
+    if os.name == 'nt':
+        default_export_path = os.path.join(os.getenv("USERPROFILE"), "Documents", "Adobe", "Adobe Substance 3D Painter", "export")
+    else:
+        default_export_path = os.path.join(os.getenv("HOME"), "Documents", "Adobe", "Adobe Substance 3D Painter", "export")
     
     
 
