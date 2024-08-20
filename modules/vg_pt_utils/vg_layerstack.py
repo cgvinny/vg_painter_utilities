@@ -15,7 +15,8 @@ __author__ = "Vincent GAULT - Adobe"
 
 
 # Modules Import
-from substance_painter import textureset, layerstack, project, resource, logging
+from cgitb import grey
+from substance_painter import textureset, layerstack, project, resource, logging, colormanagement
 
 
 class VG_StackManager:
@@ -247,6 +248,23 @@ class VG_StackManager:
             for pos in insertion_positions:
                 layerstack.insert_generator_effect(pos, generator_resource.identifier())
                 
+  
+    # Add Mask with Fill layer
+    def add_mask_with_fill(self):
+        """Adds a black mask with a fill layer to the currently selected layer."""
+        current_layer = layerstack.get_selected_nodes(self.current_stack)
+        self.add_mask() # Add a mask
+        
+        
+        inside_mask = layerstack.InsertPosition.inside_node(current_layer[0], layerstack.NodeStack.Mask) # defines position for the fill effect
+        my_fill_effect_mask = layerstack.insert_fill(inside_mask)
+        
+        
+        pure_white = colormanagement.Color(1.0, 1.0, 1.0)
+        my_fill_effect_mask.set_source(channeltype=None, source=pure_white)
+
+
+ 
                 
     
     #Delete Full Stack Content
@@ -257,6 +275,7 @@ class VG_StackManager:
             
             
     
+    # Generate Reference point layer
     def generate_ref_point_layer(self):
         
         base_name = "REF POINT LAYER"        

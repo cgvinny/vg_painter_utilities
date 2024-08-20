@@ -93,6 +93,14 @@ def on_ctrl_plus_m_shortcut_activated():
         stack_manager.add_mask()
     except Exception as e:
         logging.error(f"Failed to add black mask: {e}")
+        
+def on_shift_plus_m_shortcut_activated():
+    """Adds a black mask with fill effect."""
+    try:
+        stack_manager = vg_layerstack.VG_StackManager()
+        stack_manager.add_mask_with_fill()
+    except Exception as e:
+        logging.error(f"Failed to add black mask with fill: {e}")
 
 def on_ctrl_plus_shift_plus_m_shortcut_activated():
     """Adds a black mask with AO Generator to the selected layer."""
@@ -147,6 +155,7 @@ def define_shortcuts():
         QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_F: on_ctrl_plus_shift_plus_f_shortcut_activated,
         QtCore.Qt.CTRL + QtCore.Qt.Key_P: on_ctrl_plus_p_shortcut_activated,
         QtCore.Qt.CTRL + QtCore.Qt.Key_M: on_ctrl_plus_m_shortcut_activated,
+        QtCore.Qt.SHIFT + QtCore.Qt.Key_M: on_shift_plus_m_shortcut_activated,
         QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_M: on_ctrl_plus_shift_plus_m_shortcut_activated,
         QtCore.Qt.CTRL + QtCore.Qt.ALT + QtCore.Qt.Key_M: on_ctrl_plus_alt_plus_m_shortcut_activated,
         QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_G: on_ctrl_plus_shift_plus_g_shortcut_activated,
@@ -170,6 +179,7 @@ def start_plugin():
     logging.info("Ctrl + Shift + F: New Fill layer, all channels activated")
     logging.info("---")
     logging.info("Ctrl + M: Add black mask to selected layer")
+    logging.info("Shift + M: Add black mask with Fill")
     logging.info("Ctrl + Shift + M: Add black mask with AO Generator")
     logging.info("Ctrl + Alt + M: Add black mask with Curvature Generator")
     logging.info("---")
