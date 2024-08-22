@@ -17,7 +17,7 @@ import importlib
 import os
 
 from substance_painter import ui, logging
-from vg_pt_utils import vg_export, vg_layerstack
+from vg_pt_utils import vg_baking, vg_export, vg_layerstack
 
 plugin_menus_widgets = []
 """Keeps track of added UI elements for cleanup."""
@@ -99,7 +99,20 @@ def create_ref_point_layer():
 
 
 
-########################################################### 
+
+
+
+########################### QUICK BAKE ########################### 
+
+def launch_quick_bake():
+    """Quickly bake mesh maps of the current texture set"""
+    baker_manager = vg_baking.VG_BakerManager()
+    baker_manager.quick_bake()
+    
+    
+#################################################################
+
+
 
 from PySide2.QtGui import QKeySequence
 
@@ -131,7 +144,8 @@ def create_menu():
         None,  # Separator
         ("Create Reference Point Layer", create_ref_point_layer, "Ctrl+R"),
         None,  # Separator
-        #("Settings", open_settings_window, None)  # Settings button
+        #("Settings", open_settings_window, None)  # Settings button,
+        ("quick bake", launch_quick_bake, "Ctrl+B"),
     ]
 
     # Add actions and separators to the menu
@@ -166,8 +180,10 @@ def reload_plugin():
     """Reload plugin modules."""
     importlib.reload(vg_layerstack)
     importlib.reload(vg_export)
+    importlib.reload(vg_baking)
 
 if __name__ == "__main__":
     importlib.reload(vg_layerstack)
     importlib.reload(vg_export)
+    importlib.reload(vg_baking)
     start_plugin()

@@ -194,7 +194,6 @@ class VG_StackManager:
             logging.error("Invalid mask color. Choose 'Black' or 'White'.")
             return
 
-        # self._current_stack = textureset.get_active_stack()
         if self.current_stack:
             current_layer = layerstack.get_selected_nodes(self.current_stack)
 
