@@ -1,6 +1,6 @@
 # VG Painter Utilities (vg_pt_utils)
 
-**VG Painter Utilities (vg_pt_utils)** is a suite of tools and shortcuts designed to add functionality to Substance 3D Painter.
+**VG Painter Utilities (vg_pt_utils)** is a suite of tools and shortcuts designed to add functionalities to Substance 3D Painter.
 
 Feel free to use, reuse and adapt this content to your needs
 (Please read the [LICENSE](LICENSE) file for more information)
@@ -50,3 +50,10 @@ In Substance 3D Painter; go to the "Python" top menu and reload the plugins fold
 
 ---
 `Ctrl + shift + G`: Create new layer from what is visible in the stack (so you can delete these layers if you don't need to edit them anymore, thus improving performances.).Note that normal channel is deactivated, to avoid generatin normal information twice with the height map.
+
+---
+'Ctrl + R':  Create Reference point layer.
+
+
+___
+'Ctrl + B':  Bake current Texture Set mesh maps. 
