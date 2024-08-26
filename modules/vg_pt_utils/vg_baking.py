@@ -16,7 +16,7 @@ __author__ = "Vincent GAULT - Adobe"
 #Modules import
 import math
 from substance_painter import baking, textureset, ui, event
-from vg_pt_utils import vg_export
+from vg_pt_utils import vg_export, vg_project_info
 
 from substance_painter.baking import BakingParameters
 
@@ -48,8 +48,9 @@ class VG_BakerManager:
         
         
         # Get textureSet name
-        export_manager = vg_export.VG_ExportManager()
-        textureset_info = export_manager.get_textureset_info()
+        export_manager = vg_project_info.TextureSetInfo()
+        textureset_info = export_manager.fetch_texture_set_info_from_stack()
+        
         textureset_name = textureset_info["Name"]
         current_textureset = textureset_info["Texture Set"]
         current_resolution = current_textureset.get_resolution()
@@ -71,7 +72,7 @@ class VG_BakerManager:
 
         
                
-        current_textureset_info = vg_export.VG_ExportManager.get_textureset_info(self)
+        current_textureset_info = textureset_info = export_manager.fetch_texture_set_info_from_stack()
         current_textureset = current_textureset_info["Texture Set"]
         
         

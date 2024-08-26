@@ -16,8 +16,8 @@ from PySide2 import QtWidgets
 import importlib
 import os
 
-from substance_painter import ui, logging
-from vg_pt_utils import vg_baking, vg_export, vg_layerstack
+from substance_painter import ui, logging, export
+from vg_pt_utils import vg_baking, vg_export, vg_layerstack, vg_project_info
 
 plugin_menus_widgets = []
 """Keeps track of added UI elements for cleanup."""
@@ -75,17 +75,14 @@ def add_mask_with_fill_effect():
 
 def create_layer_from_stack():
     """Generate a layer from the visible content in the stack."""
-    exporter_manager = vg_export.VG_ExportManager()
-    exported_textures = exporter_manager.export_active_texture_set()
-    exporter_manager.import_textures_to_layer(exported_textures)
+    vg_export.create_layer_from_stack()
+    
+    
 
 def flatten_stack():
-    """Flatten the stack by exporting and importing textures."""
-    exporter_manager = vg_export.VG_ExportManager()
-    stack_manager = vg_layerstack.VG_StackManager()
-    exported_textures = exporter_manager.export_active_texture_set()
-    stack_manager.delete_stack_content()
-    exporter_manager.import_textures_to_layer(exported_textures)
+    """Flatten the stack by exporting and importing textures."""    
+    vg_export.flatten_stack()
+    
 
 
 
@@ -181,9 +178,12 @@ def reload_plugin():
     importlib.reload(vg_layerstack)
     importlib.reload(vg_export)
     importlib.reload(vg_baking)
+    importlib.reload(vg_project_info)
 
 if __name__ == "__main__":
     importlib.reload(vg_layerstack)
     importlib.reload(vg_export)
     importlib.reload(vg_baking)
+    importlib.reload(vg_project_info)
+
     start_plugin()
