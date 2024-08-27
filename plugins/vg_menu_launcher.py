@@ -26,25 +26,25 @@ plugin_menus_widgets = []
 
 def new_fill_layer_base():
     """Create a new fill layer with Base Color activated."""
-    stack_manager = vg_layerstack.VG_StackManager()
-    stack_manager.add_layer('fill', active_channels=["BaseColor"])
+    layer_manager = vg_layerstack.LayerManager()
+    layer_manager.add_layer('fill', active_channels=["BaseColor"])
 
 def new_fill_layer_height():
     """Create a new fill layer with Height channel activated."""
-    stack_manager = vg_layerstack.VG_StackManager()
-    stack_manager.add_layer('fill', active_channels=["Height"])
+    layer_manager = vg_layerstack.LayerManager()
+    layer_manager.add_layer('fill', active_channels=["Height"])
 
 def new_fill_layer_all():
     """Create a new fill layer with all channels activated."""
-    stack_manager = vg_layerstack.VG_StackManager()
-    stack_manager.add_layer('fill')
+    layer_manager = vg_layerstack.LayerManager()
+    layer_manager.add_layer('fill')
 
 ######## PAINT LAYER FUNCTIONS ########    
 
 def new_paint_layer():
     """Create a new paint layer."""
-    stack_manager = vg_layerstack.VG_StackManager()
-    stack_manager.add_layer('paint')
+    layer_manager = vg_layerstack.LayerManager()
+    layer_manager.add_layer('paint')
 
 ######## MASK FUNCTIONS ########
 
@@ -107,8 +107,6 @@ def launch_quick_bake():
     
     
 #################################################################
-
-
 
 from PySide2.QtGui import QKeySequence
 
