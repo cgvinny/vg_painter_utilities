@@ -10,6 +10,8 @@ import os
 from substance_painter import export, textureset, resource, layerstack
 from vg_pt_utils import vg_layerstack, vg_project_info
 
+
+
 class ExportConfigGenerator:
     """
     Generates the export configuration for the active texture set.
@@ -121,22 +123,19 @@ class TextureExporter:
             print(f"Error during texture export: {e}")
             return None
 
-class TextureImporter:
+
+class LayerCreator:
     """
-    Imports the exported textures into a new fill layer and assigns them to the appropriate channels.
+    Responsible for creating a new fill layer at the top of the stack.
     """
 
-    def import_textures_to_layer(self, textures_to_import):
+    def create_new_fill_layer(self):
         """
-        Import the exported textures into a new fill layer.
+        Create a new fill layer at the top of the stack.
 
-        Args:
-            textures_to_import (object): The exported textures to be imported.
+        Returns:
+            object: The newly created layer.
         """
-        if not textures_to_import:
-            print("No textures to import.")
-            return
-
         current_stack_manager = vg_layerstack.VG_StackManager()
         new_layer = current_stack_manager.add_layer("fill", layer_position="On Top")
         new_layer.set_name("Stack layer")
@@ -145,7 +144,23 @@ class TextureImporter:
         for new_layer_channel in new_layer.active_channels:
             normal_blending = layerstack.BlendingMode(2)
             new_layer.set_blending_mode(normal_blending, new_layer_channel)
+        
+        return new_layer
 
+
+class TextureAssigner:
+    """
+    Responsible for assigning imported textures to the correct channels in a fill layer.
+    """
+
+    def assign_textures_to_layer(self, new_layer, textures_to_import):
+        """
+        Assign the imported textures to the correct channels in the new fill layer.
+
+        Args:
+            new_layer (object): The fill layer where the textures will be assigned.
+            textures_to_import (object): The exported textures to be imported.
+        """
         for texture_list_key in textures_to_import.textures.keys():
             current_texture_list = textures_to_import.textures[texture_list_key]
 
@@ -163,6 +178,31 @@ class TextureImporter:
         print("Textures imported and assigned to the new fill layer.")
 
 
+class TextureImporter:
+    """
+    Manages the process of importing exported textures into a new fill layer and assigning them to the appropriate channels.
+    """
+
+    def __init__(self):
+        self.layer_creator = LayerCreator()
+        self.texture_assigner = TextureAssigner()
+
+    def import_textures_to_layer(self, textures_to_import):
+        """
+        Import the exported textures into a new fill layer.
+
+        Args:
+            textures_to_import (object): The exported textures to be imported.
+        """
+        if not textures_to_import:
+            print("No textures to import.")
+            return
+
+        new_layer = self.layer_creator.create_new_fill_layer()
+        self.texture_assigner.assign_textures_to_layer(new_layer, textures_to_import)
+
+
+
 
 
 
@@ -170,7 +210,6 @@ class TextureImporter:
 
 def create_layer_from_stack():
     """Generate a layer from the visible content in the stack."""
-    
     
     export_path = export.get_default_export_path()
     config_generator = ExportConfigGenerator(export_path)
@@ -187,11 +226,9 @@ def create_layer_from_stack():
         importer = TextureImporter()
         importer.import_textures_to_layer(exported_textures)
         
-        
-        
+
 def flatten_stack():
     """Flatten the stack by exporting and importing textures."""
-    
     
     export_path = export.get_default_export_path()
     config_generator = ExportConfigGenerator(export_path)
@@ -210,9 +247,9 @@ def flatten_stack():
         importer = TextureImporter()
         importer.import_textures_to_layer(exported_textures)
 
-
-
-
+        
+        
+ 
 
 #####################################
 

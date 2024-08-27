@@ -103,8 +103,7 @@ def create_ref_point_layer():
 
 def launch_quick_bake():
     """Quickly bake mesh maps of the current texture set"""
-    baker_manager = vg_baking.VG_BakerManager()
-    baker_manager.quick_bake()
+    vg_baking.quick_bake()
     
     
 #################################################################
