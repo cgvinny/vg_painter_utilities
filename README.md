@@ -29,31 +29,30 @@ Once activated, a new "VG Utilities" will be added to the top bar, giving access
 In Substance 3D Painter; go to the "Python" top menu and reload the plugins folder: "vg_menu_launcher" should be present
 
 
-### Shortcuts
-`Ctrl + P`: new Paint layer
+### Features
+New Paint layer (`Ctrl + P`)
 
 ---
-`Ctrl + F`: new Fill layer with Base Color activated
+New Fill layer with Base Color activated (`Ctrl + F`)
 
-`Ctrl + Alt + F`: new Fill layer with Height activated
+New Fill layer with Height activated (`Ctrl + Alt + F`)
 
-`Ctrl + Shift + F`: new Fill layer, all channels activated
-
----
-`Ctrl + M`: add mask to selected layer. If a mask is already present, it will switch it from black to white, or from white to black
-
-`Shift + M`: add mask with a fill effect to selected layer. If a mask is already present, it will switch it from black to white, or from white to black
-
-`Ctrl + Shift + M`: add black mask with AO Generator
-
-`Ctrl + alt + M`: add black mask Curvature Generator
+New Fill layer, all channels activated (`Ctrl + Shift + F`)
 
 ---
-`Ctrl + shift + G`: Create new layer from what is visible in the stack (so you can delete these layers if you don't need to edit them anymore, thus improving performances.).Note that normal channel is deactivated, to avoid generatin normal information twice with the height map.
+Add mask to selected layer. If a mask is already present, it will switch it from black to white, or from white to black (`Ctrl + M`)
+
+Add mask with a fill effect to selected layer. If a mask is already present, it will switch it from black to white, or from white to black (`Shift + M`)
+
+Add black mask with AO Generator (`Ctrl + Shift + M`)
+
+Add black mask Curvature Generator (`Ctrl + alt + M`)
 
 ---
-`Ctrl + R`:  Create Reference point layer.
+Create new layer from what is visible in the stack (so you can delete these layers if you don't need to edit them anymore, thus improving performances.).Note that normal channel is deactivated, to avoid generatin normal information twice with the height map (`Ctrl + shift + G`)
 
 
-___
-`Ctrl + B`:  Bake current Texture Set mesh maps. 
+Create Reference point layer (`Ctrl + R`)
+
+---
+Bake current Texture Set mesh maps (`Ctrl + B`)
