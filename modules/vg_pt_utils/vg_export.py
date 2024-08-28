@@ -124,28 +124,6 @@ class TextureExporter:
             return None
 
 
-class LayerCreator: #to be (re)moved
-    """
-    Responsible for creating a new fill layer at the top of the stack.
-    """
-
-    def create_new_fill_layer(self):
-        """
-        Create a new fill layer at the top of the stack.
-
-        Returns:
-            object: The newly created layer.
-        """
-        current_stack_manager = vg_layerstack.LayerManager()
-        new_layer = current_stack_manager.add_layer("fill", layer_position="On Top", layer_name="Stack layer")
-        new_layer.active_channels = set(new_layer.active_channels)
-
-        for new_layer_channel in new_layer.active_channels:
-            normal_blending = layerstack.BlendingMode(2)
-            new_layer.set_blending_mode(normal_blending, new_layer_channel)
-        
-        return new_layer
-
 
 class TextureAssigner:
     """
@@ -183,7 +161,6 @@ class TextureImporter:
     """
 
     def __init__(self):
-        self.layer_creator = LayerCreator()
         self.texture_assigner = TextureAssigner()
 
     def import_textures_to_layer(self, textures_to_import):
@@ -197,7 +174,15 @@ class TextureImporter:
             print("No textures to import.")
             return
 
-        new_layer = self.layer_creator.create_new_fill_layer()
+        
+        current_stack_manager = vg_layerstack.LayerManager()
+        new_layer = current_stack_manager.add_layer("fill", layer_position="On Top", layer_name="Stack layer")
+        new_layer.active_channels = set(new_layer.active_channels)
+
+        for new_layer_channel in new_layer.active_channels:
+            normal_blending = layerstack.BlendingMode(2)
+            new_layer.set_blending_mode(normal_blending, new_layer_channel)
+        
         self.texture_assigner.assign_textures_to_layer(new_layer, textures_to_import)
 
 

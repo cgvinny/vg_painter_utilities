@@ -135,9 +135,16 @@ class LayerManager:
                     if sublayer.get_name().startswith(base_name):
                         ref_point_count += 1
 
-        ref_point_name = f"{base_name} ({ref_point_count})"    
+        # Fotmat the counter to be 2 digit numbers
+        formatted_ref_point_count = f"_{str(ref_point_count).zfill(2)}"
+
+        # build ref pint name
+        ref_point_name = f"{base_name}{formatted_ref_point_count}"
+
+        # Add new layer with proper name
         ref_point_layer = self.add_layer("paint", layer_position="Above")
         ref_point_layer.set_name(ref_point_name)
+
 
         for new_layer_channel in ref_point_layer.active_channels:
             normal_blending = layerstack.BlendingMode(25)
