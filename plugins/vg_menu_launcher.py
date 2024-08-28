@@ -27,46 +27,50 @@ plugin_menus_widgets = []
 def new_fill_layer_base():
     """Create a new fill layer with Base Color activated."""
     layer_manager = vg_layerstack.LayerManager()
-    layer_manager.add_layer('fill', active_channels=["BaseColor"])
+    layer_manager.add_layer(layer_type='fill', active_channels=["BaseColor"], layer_name="New fill layer")
 
 def new_fill_layer_height():
     """Create a new fill layer with Height channel activated."""
     layer_manager = vg_layerstack.LayerManager()
-    layer_manager.add_layer('fill', active_channels=["Height"])
+    layer_manager.add_layer(layer_type='fill', active_channels=["Height"], layer_name="New fill layer")
 
 def new_fill_layer_all():
     """Create a new fill layer with all channels activated."""
     layer_manager = vg_layerstack.LayerManager()
-    layer_manager.add_layer('fill')
+    layer_manager.add_layer(layer_type='fill', layer_name="New fill layer")
 
 ######## PAINT LAYER FUNCTIONS ########    
 
 def new_paint_layer():
     """Create a new paint layer."""
     layer_manager = vg_layerstack.LayerManager()
-    layer_manager.add_layer('paint')
+    layer_manager.add_layer(layer_type='paint',layer_name="New Paint layer")
 
 ######## MASK FUNCTIONS ########
 
 def add_mask():
     """Add a black mask to the selected layer."""
-    stack_manager = vg_layerstack.VG_StackManager()
-    stack_manager.add_mask()
+    layer_manager = vg_layerstack.LayerManager()
+    mask_manager = vg_layerstack.MaskManager(layer_manager)
+    mask_manager.add_mask()
 
 def add_ao_mask():
     """Add a black mask with AO Generator."""
-    stack_manager = vg_layerstack.VG_StackManager()
-    stack_manager.add_black_mask_with_ao_generator()
+    layer_manager = vg_layerstack.LayerManager()
+    mask_manager = vg_layerstack.MaskManager(layer_manager)
+    mask_manager.add_black_mask_with_ao_generator()
 
 def add_curvature_mask():
     """Add a black mask with Curvature Generator."""
-    stack_manager = vg_layerstack.VG_StackManager()
-    stack_manager.add_black_mask_with_curvature_generator()
+    layer_manager = vg_layerstack.LayerManager()
+    mask_manager = vg_layerstack.MaskManager(layer_manager)
+    mask_manager.add_black_mask_with_curvature_generator()
 
 def add_mask_with_fill_effect():
     """Add a mask with a fill effect."""
-    stack_manager = vg_layerstack.VG_StackManager()
-    stack_manager.add_mask_with_fill()
+    layer_manager = vg_layerstack.LayerManager()
+    mask_manager = vg_layerstack.MaskManager(layer_manager)
+    mask_manager.add_mask_with_fill()
 
 
 
@@ -91,7 +95,7 @@ def flatten_stack():
 
 def create_ref_point_layer():
     """Create a reference point layer"""
-    stack_manager = vg_layerstack.VG_StackManager()
+    stack_manager = vg_layerstack.LayerManager()
     stack_manager.generate_ref_point_layer()
 
 

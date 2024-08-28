@@ -12,6 +12,7 @@ Substance 3D Painter.
 __author__ = "Vincent GAULT - Adobe"
 
 # Modules Import
+import string
 from substance_painter import textureset, layerstack, project, resource, logging, colormanagement
 
 
@@ -62,7 +63,7 @@ class LayerManager:
     def refresh_layer_selection(self):
         self.layer_selection = layerstack.get_selected_nodes(self.current_stack)
 
-    def add_layer(self, layer_type, active_channels=None, layer_position="Above"):
+    def add_layer(self, layer_type, layer_name ="New Layer", active_channels=None, layer_position="Above"):
         """Add a layer of specified type to the current stack with optional active channels"""
         
         if layer_position not in ["Above", "On Top"]:
@@ -70,18 +71,20 @@ class LayerManager:
             return None
         
         current_layer_count = self._stack_layers_count
-        
         if self._current_stack is None:
             logging.error("No active stack found")
             return None
+        
         
         insert_position = None
         selected_layer = layerstack.get_selected_nodes(self._current_stack)
         
         if current_layer_count == 0:
             insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
+            
         elif layer_position == "Above":
             insert_position = layerstack.InsertPosition.above_node(selected_layer[0])
+            
         elif layer_position == "On Top":
             insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
         
@@ -89,10 +92,10 @@ class LayerManager:
         
         if layer_type == 'fill':
             new_layer = layerstack.insert_fill(insert_position)
-            new_layer.set_name("New Fill layer")
+           
         elif layer_type == 'paint':
             new_layer = layerstack.insert_paint(insert_position)
-            new_layer.set_name("New Paint layer")
+            
         else:
             logging.error("Invalid layer type")
             return
@@ -103,15 +106,19 @@ class LayerManager:
             active_channels = self._current_stack.all_channels()
             new_layer.active_channels = set(active_channels)
 
+        
+        new_layer.set_name(layer_name)
         layerstack.set_selected_nodes([new_layer])
         
         return new_layer if new_layer else None
 
+    
     def delete_stack_content(self):
         """Delete all layers in the current stack."""
         current_layers = self.stack_layers
         for layer in current_layers:
             layerstack.delete_node(layer)
+            
 
     def generate_ref_point_layer(self):
         """Generate a reference point layer with unique naming and specific effects."""

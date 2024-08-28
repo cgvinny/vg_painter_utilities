@@ -124,7 +124,7 @@ class TextureExporter:
             return None
 
 
-class LayerCreator:
+class LayerCreator: #to be (re)moved
     """
     Responsible for creating a new fill layer at the top of the stack.
     """
@@ -136,9 +136,8 @@ class LayerCreator:
         Returns:
             object: The newly created layer.
         """
-        current_stack_manager = vg_layerstack.VG_StackManager()
-        new_layer = current_stack_manager.add_layer("fill", layer_position="On Top")
-        new_layer.set_name("Stack layer")
+        current_stack_manager = vg_layerstack.LayerManager()
+        new_layer = current_stack_manager.add_layer("fill", layer_position="On Top", layer_name="Stack layer")
         new_layer.active_channels = set(new_layer.active_channels)
 
         for new_layer_channel in new_layer.active_channels:
@@ -238,7 +237,7 @@ def flatten_stack():
 
     # Perform the export
     exporter = TextureExporter()
-    stack_manager = vg_layerstack.VG_StackManager()
+    stack_manager = vg_layerstack.LayerManager()
     exported_textures = exporter.export_textures(export_config)    
     stack_manager.delete_stack_content()
 

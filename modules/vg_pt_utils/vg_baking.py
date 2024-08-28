@@ -6,7 +6,7 @@
 ##########################################################################
 
 """
-This module contains different utilities related to baking in Substance 3D Painter.
+This module contains different utilities related to mesh maps baking in Substance 3D Painter.
 """
 __author__ = "Vincent GAULT - Adobe"
 
@@ -22,7 +22,14 @@ class BakingParameterConfigurator:
     Responsible for configuring baking parameters based on the texture set information.
     """
 
-    def configure_baking_parameters(self, textureset_name, width, height):
+    #Build a list of the mesh maps to bake for the baking params
+    def mesh_maps_to_bake_list(self, id_list: list):
+        map_id_list = id_list
+        map_usage_list = [textureset.MeshMapUsage(id) for id in id_list]
+        return map_usage_list
+
+    
+    def configure_baking_parameters(self, textureset_name, width, height, mesh_maps_to_bake):
         """
         Configure the baking parameters based on the texture set name and resolution.
 
@@ -34,13 +41,11 @@ class BakingParameterConfigurator:
         Returns:
             BakingParameters: Configured baking parameters.
         """
+        
         baking_params = BakingParameters.from_texture_set_name(textureset_name)
         common_params = baking_params.common()
         baking_params.set({common_params['OutputSize']: (width, height)})
-
-        # Build list of mesh maps to bake
-        id_list = [1, 2, 3, 4, 5, 8, 9]
-        map_usage_list = [textureset.MeshMapUsage(id) for id in id_list]
+        map_usage_list = self.mesh_maps_to_bake_list(mesh_maps_to_bake)
 
         # Activate proper bakers
         baking_params.set_enabled_bakers(map_usage_list)
@@ -56,7 +61,7 @@ class BakingProcessManager:
     def __init__(self):
         self._current_baking_settings = None
 
-    def on_baking_process_ended(self, e):
+    def switch_to_paint_view(self, e):
         """
         Event handler for when the baking process ends. Switches to paint view.
         """
@@ -64,7 +69,8 @@ class BakingProcessManager:
         paint_mode = ui.UIMode(1)
         ui.switch_to_mode(paint_mode)
         print("Paint view activated.")
-        event.DISPATCHER.disconnect(event.BakingProcessEnded, self.on_baking_process_ended)
+        
+        event.DISPATCHER.disconnect(event.BakingProcessEnded, self.switch_to_paint_view)
 
     def start_baking(self, current_texture_set):
         """
@@ -74,7 +80,7 @@ class BakingProcessManager:
             current_texture_set (object): The current texture set to bake.
         """
         # Connect the event to the function to switch to the paint view
-        event.DISPATCHER.connect_strong(event.BakingProcessEnded, self.on_baking_process_ended)
+        event.DISPATCHER.connect_strong(event.BakingProcessEnded, self.switch_to_paint_view)
 
         # Start baking process
         baking.bake_async(current_texture_set)
@@ -105,7 +111,7 @@ def quick_bake():
     
     # Configure baking parameters
     baking_param_configurator = BakingParameterConfigurator()
-    baking_params = baking_param_configurator.configure_baking_parameters(textureset_name, width, height)
+    baking_params = baking_param_configurator.configure_baking_parameters(textureset_name, width, height, [1, 2, 3, 4, 5, 8, 9])
 
     # Start baking
     baking_process_manager = BakingProcessManager()
