@@ -30,29 +30,29 @@ In Substance 3D Painter; go to the "Python" top menu and reload the plugins fold
 
 
 ### Features
-New Paint layer (`Ctrl + P`)
+New Paint layer ( `Ctrl + P` )
 
 ---
-New Fill layer with Base Color activated (`Ctrl + F`)
+New Fill layer with Base Color activated ( `Ctrl + F` )
 
-New Fill layer with Height activated (`Ctrl + Alt + F`)
+New Fill layer with Height activated ( `Ctrl + Alt + F` )
 
-New Fill layer, all channels activated (`Ctrl + Shift + F`)
-
----
-Add mask to selected layer. If a mask is already present, it will switch it from black to white, or from white to black (`Ctrl + M`)
-
-Add mask with a fill effect to selected layer. If a mask is already present, it will switch it from black to white, or from white to black (`Shift + M`)
-
-Add black mask with AO Generator (`Ctrl + Shift + M`)
-
-Add black mask Curvature Generator (`Ctrl + alt + M`)
+New Fill layer, all channels activated ( `Ctrl + Shift + F` )
 
 ---
-Create new layer from what is visible in the stack (so you can delete these layers if you don't need to edit them anymore, thus improving performances.).Note that normal channel is deactivated, to avoid generatin normal information twice with the height map (`Ctrl + shift + G`)
+Add mask to selected layer. If a mask is already present, it will switch it from black to white, or from white to black ( `Ctrl + M` )
 
+Add mask with a fill effect to selected layer. If a mask is already present, it will switch it from black to white, or from white to black ( `Shift + M` )
 
-Create Reference point layer (`Ctrl + R`)
+Add black mask with AO Generator ( `Ctrl + Shift + M` )
+
+Add black mask Curvature Generator ( `Ctrl + alt + M` )
 
 ---
-Bake current Texture Set mesh maps (`Ctrl + B`)
+Create new layer from what is visible in the stack (so you can delete these layers if you don't need to edit them anymore, thus improving performances.).Note that normal channel is deactivated, to avoid generatin normal information twice with the height map ( `Ctrl + shift + G` )
+
+
+Create Reference point layer ( `Ctrl + R` )
+
+---
+Bake current Texture Set mesh maps ( `Ctrl + B` )
