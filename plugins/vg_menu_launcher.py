@@ -38,6 +38,12 @@ def new_fill_layer_all():
     """Create a new fill layer with all channels activated."""
     layer_manager = vg_layerstack.LayerManager()
     layer_manager.add_layer(layer_type='fill', layer_name="New fill layer")
+    
+
+def new_fill_layer_empty():
+    layer_manager = vg_layerstack.LayerManager()
+    layer_manager.add_layer(layer_type='fill', active_channels=[""], layer_name="New fill layer")
+
 
 ######## PAINT LAYER FUNCTIONS ########    
 
@@ -131,6 +137,7 @@ def create_menu():
         ("New Fill Layer with Base Color", new_fill_layer_base, "Ctrl+F"),
         ("New Fill Layer with Height", new_fill_layer_height, "Ctrl+Alt+F"),
         ("New Fill Layer with All Channels", new_fill_layer_all, "Ctrl+Shift+F"),
+        ("New Fill Layer, no channel", new_fill_layer_empty, "Alt+F"),
         None,  # Separator
         ("Add Mask to Selected Layer", add_mask, "Ctrl+M"),
         ("Add Mask with Fill Effect", add_mask_with_fill_effect, "Shift+M"),
