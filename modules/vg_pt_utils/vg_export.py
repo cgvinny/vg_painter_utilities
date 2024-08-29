@@ -41,9 +41,17 @@ class ExportConfigGenerator:
 
         raw_channels_list = current_textureset_info["Channels"]
         channels_names = [element.name for element in raw_channels_list]
+        channels_names =    [
+                            'ambientOcclusion' if element.name == 'AO' else element.name
+                            for element in raw_channels_list
+                            ]
+        
+        
         current_channels_info = []
 
         for channel_name in channels_names:
+            
+            
             channels_info = [
                 {
                     "destChannel": channel,
@@ -52,8 +60,10 @@ class ExportConfigGenerator:
                     "srcMapName": channel_name
                 } for channel in "RGBA"
             ]
-
-            current_filename = f'$mesh_$textureSet_{channel_name}.$udim'
+            
+            
+            current_filename = f'$mesh_$textureSet_{channel_name}.$udim'            
+                
             current_channels_info.append({
                 'fileName': current_filename,
                 'channels': channels_info,
@@ -149,6 +159,9 @@ class TextureAssigner:
                 if last_underscore_index != -1 and extension_index != -1:
                     channel_type_string = texture_path[last_underscore_index + 1:extension_index]
                     channel_type_string = channel_type_string.split(".")[0]
+                    if channel_type_string=='ambientOcclusion':
+                        channel_type_string='AO'
+                    print(channel_type_string)
                     channel_type = getattr(layerstack.ChannelType, channel_type_string)
                     new_layer.set_source(channel_type, texture_resource.identifier())
 
@@ -223,8 +236,9 @@ def flatten_stack():
     # Perform the export
     exporter = TextureExporter()
     stack_manager = vg_layerstack.LayerManager()
-    exported_textures = exporter.export_textures(export_config)    
-    stack_manager.delete_stack_content()
+    exported_textures = exporter.export_textures(export_config)
+    
+    stack_manager.delete_stack_content() #delete before to reimport
 
     # Import the textures to a new layer
     if exported_textures:
