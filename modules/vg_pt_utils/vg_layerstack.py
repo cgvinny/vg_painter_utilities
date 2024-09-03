@@ -223,7 +223,8 @@ class MaskManager:
                 layerstack.insert_generator_effect(pos, generator_resource.identifier())
 
     def add_mask_with_fill(self):
-        """Adds a black mask with a fill layer to the currently selected layer."""
+        """Adds a black mask with a fill layer to the currently selected layer.
+        """
         current_layer = layerstack.get_selected_nodes(self.layer_manager.current_stack)
         self.add_mask()
         
@@ -232,3 +233,13 @@ class MaskManager:
         
         pure_white = colormanagement.Color(1.0, 1.0, 1.0)
         my_fill_effect_mask.set_source(channeltype=None, source=pure_white)
+        
+
+
+
+
+
+        
+    
+        
+

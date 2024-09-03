@@ -14,9 +14,8 @@ __author__ = "Vincent GAULT - Adobe"
 # Modules import
 from PySide2 import QtWidgets
 import importlib
-import os
 
-from substance_painter import ui, logging, export
+from substance_painter import ui, logging
 from vg_pt_utils import vg_baking, vg_export, vg_layerstack, vg_project_info
 
 plugin_menus_widgets = []
@@ -87,14 +86,10 @@ def create_layer_from_stack():
     """Generate a layer from the visible content in the stack."""
     vg_export.create_layer_from_stack()
     
-    
 
 def flatten_stack():
     """Flatten the stack by exporting and importing textures."""    
     vg_export.flatten_stack()
-    
-
-
 
 
 ############## CREATE REFERENCE POINT LAYER ####################### 
@@ -103,10 +98,6 @@ def create_ref_point_layer():
     """Create a reference point layer"""
     stack_manager = vg_layerstack.LayerManager()
     stack_manager.generate_ref_point_layer()
-
-
-
-
 
 
 ########################### QUICK BAKE ########################### 
