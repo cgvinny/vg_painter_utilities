@@ -39,6 +39,8 @@ New Fill layer with Height activated ( `Ctrl + Alt + F` )
 
 New Fill layer, all channels activated ( `Ctrl + Shift + F` )
 
+New Fill layer, no  channels activated ( `Alt + F` )
+
 ---
 Add mask to selected layer. If a mask is already present, it will switch it from black to white, or from white to black ( `Ctrl + M` )
 
