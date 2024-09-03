@@ -6,6 +6,8 @@
 ##########################################################################
 
 # Modules Import
+import os, time
+
 from substance_painter import export, textureset, resource, layerstack
 from vg_pt_utils import vg_layerstack, vg_project_info
 
@@ -25,15 +27,17 @@ class TextureImporter:
             dict: A dictionary with the imported texture resources keyed by their respective paths.
         """
         imported_textures = {}
+        texture_paths = []
 
         for texture_list_key in textures_to_import.textures.keys():
             current_texture_list = textures_to_import.textures[texture_list_key]
 
             for texture_path in current_texture_list:
+                texture_paths.append(texture_path)  # Collect texture paths for cleanup later
                 texture_resource = resource.import_project_resource(texture_path, resource.Usage.TEXTURE)
                 imported_textures[texture_path] = texture_resource
 
-        return imported_textures
+        return imported_textures, texture_paths
 
 
 class ChannelTypeExtractor:
@@ -86,6 +90,27 @@ class LayerTextureAssigner:
                 new_layer.set_source(channel_type, texture_resource.identifier())
 
         print("Textures imported and assigned to the new fill layer.")
+        
+
+
+class ResourceCleaner:
+    """
+    Manages the cleanup of texture files after they are imported and assigned.
+    """
+    
+    def delete_texture_files(self, texture_paths):
+        """
+        Deletes the texture files from disk after they have been imported.
+
+        Args:
+            texture_paths (list): List of texture file paths to delete.
+        """
+        for texture_path in texture_paths:
+            try:
+                os.remove(texture_path)
+                print(f"Deleted file: {texture_path}")
+            except Exception as e:
+                print(f"Error deleting file {texture_path}: {e}")
 
 
 class TextureAssignmentManager:
@@ -96,6 +121,7 @@ class TextureAssignmentManager:
     def __init__(self):
         self.texture_importer = TextureImporter()
         self.layer_assigner = LayerTextureAssigner()
+        #self.resource_cleaner = ResourceCleaner()
 
     def import_and_assign_textures(self, new_layer, textures_to_import):
         """
@@ -105,8 +131,9 @@ class TextureAssignmentManager:
             new_layer (object): The fill layer where the textures will be assigned.
             textures_to_import (object): The exported textures to be imported.
         """
-        imported_textures = self.texture_importer.import_textures(textures_to_import)
+        imported_textures, texture_paths = self.texture_importer.import_textures(textures_to_import)
         self.layer_assigner.assign_textures_to_layer(new_layer, imported_textures)
+        #self.resource_cleaner.delete_texture_files(texture_paths)                                #do not uncomment
 
 
 class ExportConfigGenerator:
@@ -206,19 +233,14 @@ class TextureExporter:
             return None
 
 
-
-
-
-
 ##### FUNCTIONS USING THE CLASSES #####
 
 def create_layer_from_stack():
     """Generate a layer from the visible content in the stack."""
     
+    # Generate the export configuration
     export_path = export.get_default_export_path()
     config_generator = ExportConfigGenerator(export_path)
-
-    # Generate the export configuration
     export_config = config_generator.generate_export_config()
 
     # Perform the export
@@ -229,6 +251,7 @@ def create_layer_from_stack():
     if exported_textures:
         texture_manager = TextureAssignmentManager()
         current_stack_manager = vg_layerstack.LayerManager()
+
         new_layer = current_stack_manager.add_layer("fill", layer_position="On Top", layer_name="Stack layer")
         new_layer.active_channels = set(new_layer.active_channels)
         
