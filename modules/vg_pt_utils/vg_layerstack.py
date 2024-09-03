@@ -88,6 +88,7 @@ class LayerManager:
         elif layer_position == "On Top":
             insert_position = layerstack.InsertPosition.from_textureset_stack(self._current_stack)
         
+        
         new_layer = None
         
         if layer_type == 'fill':
@@ -101,7 +102,10 @@ class LayerManager:
             return
         
         if active_channels:
-            new_layer.active_channels = {getattr(textureset.ChannelType, channel) for channel in active_channels}
+            if active_channels==[""]:
+                pass
+            else:
+                new_layer.active_channels = {getattr(textureset.ChannelType, channel) for channel in active_channels}
         else:
             active_channels = self._current_stack.all_channels()
             new_layer.active_channels = set(active_channels)
