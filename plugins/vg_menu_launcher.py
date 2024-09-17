@@ -12,7 +12,8 @@ This module creates a menu to host various tools for Substance Painter.
 __author__ = "Vincent GAULT - Adobe"
 
 # Modules import
-from PySide2 import QtWidgets
+from PySide6 import QtWidgets, QtGui
+from PySide6.QtGui import QKeySequence
 import importlib
 
 from substance_painter import ui, logging
@@ -40,6 +41,7 @@ def new_fill_layer_all():
     
 
 def new_fill_layer_empty():
+    """Create a new fill layer with no channels activated."""
     layer_manager = vg_layerstack.LayerManager()
     layer_manager.add_layer(layer_type='fill', active_channels=[""], layer_name="New fill layer")
 
@@ -49,7 +51,7 @@ def new_fill_layer_empty():
 def new_paint_layer():
     """Create a new paint layer."""
     layer_manager = vg_layerstack.LayerManager()
-    layer_manager.add_layer(layer_type='paint',layer_name="New Paint layer")
+    layer_manager.add_layer(layer_type='paint', layer_name="New Paint layer")
 
 ######## MASK FUNCTIONS ########
 
@@ -78,8 +80,6 @@ def add_mask_with_fill_effect():
     mask_manager.add_mask_with_fill()
 
 
-
-
 ################ GENERATE CONTENT FROM STACK #######################    
 
 def create_layer_from_stack():
@@ -95,7 +95,7 @@ def flatten_stack():
 ############## CREATE REFERENCE POINT LAYER ####################### 
 
 def create_ref_point_layer():
-    """Create a reference point layer"""
+    """Create a reference point layer."""
     stack_manager = vg_layerstack.LayerManager()
     stack_manager.generate_ref_point_layer()
 
@@ -103,13 +103,11 @@ def create_ref_point_layer():
 ########################### QUICK BAKE ########################### 
 
 def launch_quick_bake():
-    """Quickly bake mesh maps of the current texture set"""
+    """Quickly bake mesh maps of the current texture set."""
     vg_baking.quick_bake()
     
     
 #################################################################
-
-from PySide2.QtGui import QKeySequence
 
 def create_menu():    
     """Create and populate the menu with actions."""
@@ -140,8 +138,7 @@ def create_menu():
         None,  # Separator
         ("Create Reference Point Layer", create_ref_point_layer, "Ctrl+R"),
         None,  # Separator
-        #("Settings", open_settings_window, None)  # Settings button,
-        ("quick bake", launch_quick_bake, "Ctrl+B"),
+        ("Quick Bake", launch_quick_bake, "Ctrl+B"),
     ]
 
     # Add actions and separators to the menu
@@ -150,7 +147,7 @@ def create_menu():
             vg_utilities_menu.addSeparator()
         else:
             text, func, shortcut = item
-            action = QtWidgets.QAction(text, vg_utilities_menu)
+            action = QtGui.QAction(text, vg_utilities_menu)
             action.triggered.connect(func)
             if shortcut:
                 action.setShortcut(QKeySequence(shortcut))
