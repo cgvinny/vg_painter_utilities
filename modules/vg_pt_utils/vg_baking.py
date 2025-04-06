@@ -108,10 +108,14 @@ def quick_bake():
     current_resolution = current_texture_set.get_resolution()
     width = int(math.log2(current_resolution.width))
     height = int(math.log2(current_resolution.height))
+
+    # Get the current baking parameters to retrieve user-selected maps
+    current_baking_params = BakingParameters.from_texture_set_name(textureset_name)
+    enabled_bakers = current_baking_params.get_enabled_bakers()
     
     # Configure baking parameters
     baking_param_configurator = BakingParameterConfigurator()
-    baking_params = baking_param_configurator.configure_baking_parameters(textureset_name, width, height, list(range(0, 10)))
+    baking_params = baking_param_configurator.configure_baking_parameters(textureset_name, width, height, enabled_bakers)
 
     # Start baking
     baking_process_manager = BakingProcessManager()
