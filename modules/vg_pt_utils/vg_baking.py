@@ -111,7 +111,7 @@ def quick_bake():
     
     # Configure baking parameters
     baking_param_configurator = BakingParameterConfigurator()
-    baking_params = baking_param_configurator.configure_baking_parameters(textureset_name, width, height, [1, 2, 3, 4, 5, 8, 9])
+    baking_params = baking_param_configurator.configure_baking_parameters(textureset_name, width, height, list(range(0, 10)))
 
     # Start baking
     baking_process_manager = BakingProcessManager()
