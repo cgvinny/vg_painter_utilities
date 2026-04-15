@@ -12,6 +12,7 @@ Substance 3D Painter.
 __author__ = "Vincent GAULT - Adobe"
 
 # Modules Import
+import re
 from substance_painter import textureset, layerstack, project, resource, logging, colormanagement
 
 # Blending mode constants
@@ -124,18 +125,27 @@ class LayerManager:
     def get_next_ref_point_name(self):
         """
         Return the next available ref point layer name based on the default
-        base name (e.g. 'REF POINT LAYER_03' if _01 and _02 already exist).
+        base name, using the highest existing suffix number + 1.
+
+        For example, if 'REF POINT LAYER_01' and 'REF POINT LAYER_06' exist,
+        the next suggested name will be 'REF POINT LAYER_07'.
         """
+        pattern = re.compile(rf"^{re.escape(self.REF_POINT_BASE_NAME)}_(\d+)$")
         all_nodes = layerstack.get_root_layer_nodes(self.current_stack)
-        count = 1
+
+        numbers = []
         for node in all_nodes:
-            if node.get_name().startswith(self.REF_POINT_BASE_NAME):
-                count += 1
+            match = pattern.match(node.get_name())
+            if match:
+                numbers.append(int(match.group(1)))
             if node.get_type() == layerstack.NodeType.GroupLayer:
                 for sublayer in node.sub_layers():
-                    if sublayer.get_name().startswith(self.REF_POINT_BASE_NAME):
-                        count += 1
-        return f"{self.REF_POINT_BASE_NAME}_{str(count).zfill(2)}"
+                    match = pattern.match(sublayer.get_name())
+                    if match:
+                        numbers.append(int(match.group(1)))
+
+        next_number = max(numbers) + 1 if numbers else 1
+        return f"{self.REF_POINT_BASE_NAME}_{str(next_number).zfill(2)}"
 
     def generate_ref_point_layer(self, layer_name=None):
         """
@@ -230,13 +240,33 @@ class MaskManager:
             pos = layerstack.InsertPosition.inside_node(layer, layerstack.NodeStack.Mask)
             layerstack.insert_generator_effect(pos, generator_resource.identifier())
 
-    def add_mask_with_fill(self):
-        """Add a mask with a white fill effect to the selected layer."""
+    def _mask_insert_position(self):
+        """
+        Add a mask to the selected layer and return an InsertPosition inside it.
+        Helper shared by all 'add_mask_with_X' methods.
+        """
         current_layer = layerstack.get_selected_nodes(self.layer_manager.current_stack)
         self.add_mask()
+        return layerstack.InsertPosition.inside_node(current_layer[0], layerstack.NodeStack.Mask)
 
-        inside_mask = layerstack.InsertPosition.inside_node(current_layer[0], layerstack.NodeStack.Mask)
-        fill_effect = layerstack.insert_fill(inside_mask)
+    def add_mask_with_fill(self):
+        """Add a mask with a white fill effect to the selected layer."""
+        pos = self._mask_insert_position()
+        fill_effect = layerstack.insert_fill(pos)
+        fill_effect.set_source(channeltype=None, source=colormanagement.Color(1.0, 1.0, 1.0))
 
-        pure_white = colormanagement.Color(1.0, 1.0, 1.0)
-        fill_effect.set_source(channeltype=None, source=pure_white)
+    def add_mask_with_paint(self):
+        """Add a mask with a paint layer to the selected layer."""
+        layerstack.insert_paint(self._mask_insert_position())
+
+    def add_mask_with_levels(self):
+        """Add a mask with a Levels effect to the selected layer."""
+        layerstack.insert_levels_effect(self._mask_insert_position())
+
+    def add_mask_with_compare_mask(self):
+        """Add a mask with a Compare Mask effect to the selected layer."""
+        layerstack.insert_compare_mask_effect(self._mask_insert_position())
+
+    def add_mask_with_color_selection(self):
+        """Add a mask with a Color Selection effect to the selected layer."""
+        layerstack.insert_color_selection_effect(self._mask_insert_position())

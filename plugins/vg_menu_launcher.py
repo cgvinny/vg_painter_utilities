@@ -13,6 +13,7 @@ __author__ = "Vincent GAULT - Adobe"
 
 # Modules import
 from PySide6 import QtWidgets, QtGui
+from PySide6.QtCore import QTimer
 from PySide6.QtGui import QKeySequence
 import importlib
 
@@ -21,6 +22,9 @@ from vg_pt_utils import vg_baking, vg_export, vg_layerstack, vg_project_info
 
 plugin_menus_widgets = []
 """Keeps track of added UI elements for cleanup."""
+
+_mask_popup_menu = None
+"""Module-level reference to the mask popup menu, prevents garbage collection."""
 
 ### FILL LAYER FUNCTIONS ###
 
@@ -55,29 +59,29 @@ def new_paint_layer():
 
 ### MASK FUNCTIONS ###
 
-def add_mask():
-    """Add a black mask to the selected layer."""
-    layer_manager = vg_layerstack.LayerManager()
-    mask_manager = vg_layerstack.MaskManager(layer_manager)
-    mask_manager.add_mask()
+def add_mask_popup():
+    """Open a popup menu to choose the type of mask to add to the selected layer."""
+    global _mask_popup_menu
 
-def add_ao_mask():
-    """Add a black mask with AO Generator."""
     layer_manager = vg_layerstack.LayerManager()
     mask_manager = vg_layerstack.MaskManager(layer_manager)
-    mask_manager.add_black_mask_with_ao_generator()
 
-def add_curvature_mask():
-    """Add a black mask with Curvature Generator."""
-    layer_manager = vg_layerstack.LayerManager()
-    mask_manager = vg_layerstack.MaskManager(layer_manager)
-    mask_manager.add_black_mask_with_curvature_generator()
+    _mask_popup_menu = QtWidgets.QMenu(ui.get_main_window())
+    _mask_popup_menu.addAction("Black Mask",                    lambda: mask_manager.add_mask('Black'))
+    _mask_popup_menu.addAction("White Mask",                    lambda: mask_manager.add_mask('White'))
+    _mask_popup_menu.addSeparator()
+    _mask_popup_menu.addAction("Mask with Fill Effect",          mask_manager.add_mask_with_fill)
+    _mask_popup_menu.addAction("Mask with Paint Layer",          mask_manager.add_mask_with_paint)
+    _mask_popup_menu.addSeparator()
+    _mask_popup_menu.addAction("Mask with AO Generator",         mask_manager.add_black_mask_with_ao_generator)
+    _mask_popup_menu.addAction("Mask with Curvature Generator",  mask_manager.add_black_mask_with_curvature_generator)
+    _mask_popup_menu.addSeparator()
+    _mask_popup_menu.addAction("Mask with Levels",               mask_manager.add_mask_with_levels)
+    _mask_popup_menu.addAction("Mask with Compare Mask",         mask_manager.add_mask_with_compare_mask)
+    _mask_popup_menu.addAction("Mask with Color Selection",      mask_manager.add_mask_with_color_selection)
 
-def add_mask_with_fill_effect():
-    """Add a mask with a fill effect."""
-    layer_manager = vg_layerstack.LayerManager()
-    mask_manager = vg_layerstack.MaskManager(layer_manager)
-    mask_manager.add_mask_with_fill()
+    pos = QtGui.QCursor.pos()
+    QTimer.singleShot(100, lambda: _mask_popup_menu.exec(pos))
 
 
 ### GENERATE CONTENT FROM STACK ###
@@ -142,10 +146,7 @@ def create_menu():
         ("New Fill Layer with All Channels", new_fill_layer_all, "Ctrl+Shift+F"),
         ("New Fill Layer, no channel", new_fill_layer_empty, "Alt+F"),
         None,  # Separator
-        ("Add Mask to Selected Layer", add_mask, "Ctrl+M"),
-        ("Add Mask with Fill Effect", add_mask_with_fill_effect, "Shift+M"),
-        ("Add Mask with AO Generator", add_ao_mask, "Ctrl+Shift+M"),
-        ("Add Mask with Curvature Generator", add_curvature_mask, "Ctrl+Alt+M"),
+        ("Add Mask...", add_mask_popup, "Ctrl+Shift+M"),
         None,  # Separator
         ("Create New Layer from Visible Stack", create_layer_from_stack, "Ctrl+Shift+G"),
         ("Flatten Stack", flatten_stack, None),
@@ -178,7 +179,8 @@ def start_plugin():
 
 def close_plugin():
     """Called when the plugin is stopped."""
-    # Remove all added widgets from the UI.
+    global _mask_popup_menu
+    _mask_popup_menu = None
     for widget in plugin_menus_widgets:
         ui.delete_ui_element(widget)
     plugin_menus_widgets.clear()
