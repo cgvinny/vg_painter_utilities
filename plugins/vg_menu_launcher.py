@@ -22,7 +22,7 @@ from vg_pt_utils import vg_baking, vg_export, vg_layerstack, vg_project_info
 plugin_menus_widgets = []
 """Keeps track of added UI elements for cleanup."""
 
-######## FILL LAYER FUNCTIONS ########
+### FILL LAYER FUNCTIONS ###
 
 def new_fill_layer_base():
     """Create a new fill layer with Base Color activated."""
@@ -46,14 +46,14 @@ def new_fill_layer_empty():
     layer_manager.add_layer(layer_type='fill', active_channels=[""], layer_name="New fill layer")
 
 
-######## PAINT LAYER FUNCTIONS ########    
+### PAINT LAYER FUNCTIONS ###
 
 def new_paint_layer():
     """Create a new paint layer."""
     layer_manager = vg_layerstack.LayerManager()
     layer_manager.add_layer(layer_type='paint', layer_name="New Paint layer")
 
-######## MASK FUNCTIONS ########
+### MASK FUNCTIONS ###
 
 def add_mask():
     """Add a black mask to the selected layer."""
@@ -80,7 +80,7 @@ def add_mask_with_fill_effect():
     mask_manager.add_mask_with_fill()
 
 
-################ GENERATE CONTENT FROM STACK #######################    
+### GENERATE CONTENT FROM STACK ###
 
 def create_layer_from_stack():
     """Generate a layer from the visible content in the stack."""
@@ -92,15 +92,25 @@ def flatten_stack():
     vg_export.flatten_stack()
 
 
-############## CREATE REFERENCE POINT LAYER ####################### 
+### CREATE REFERENCE POINT LAYER ###
 
 def create_ref_point_layer():
-    """Create a reference point layer."""
+    """Prompt for a name and create a reference point layer."""
     stack_manager = vg_layerstack.LayerManager()
-    stack_manager.generate_ref_point_layer()
+    default_name = stack_manager.get_next_ref_point_name()
+
+    name, ok = QtWidgets.QInputDialog.getText(
+        ui.get_main_window(),
+        "Create Reference Point Layer",
+        "Layer name:",
+        text=default_name
+    )
+
+    if ok and name.strip():
+        stack_manager.generate_ref_point_layer(layer_name=name.strip())
 
 
-########################### QUICK BAKE ########################### 
+### QUICK BAKE ###
 
 def launch_quick_bake():
     """Quickly bake mesh maps of the current texture set."""
@@ -177,9 +187,5 @@ def reload_plugin():
     importlib.reload(vg_project_info)
 
 if __name__ == "__main__":
-    importlib.reload(vg_layerstack)
-    importlib.reload(vg_export)
-    importlib.reload(vg_baking)
-    importlib.reload(vg_project_info)
-
+    reload_plugin()
     start_plugin()

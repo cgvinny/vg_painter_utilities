@@ -5,229 +5,164 @@
 #
 ##########################################################################
 
-# Modules Import
-import os, time
+"""
+This module contains utilities for exporting and re-importing textures
+in Substance 3D Painter, used to flatten or snapshot the layer stack.
+"""
+__author__ = "Vincent GAULT - Adobe"
 
 from substance_painter import export, textureset, resource, layerstack
 from vg_pt_utils import vg_layerstack, vg_project_info
+from vg_pt_utils.vg_layerstack import BLENDING_NORMAL
+
+
+def _extract_channel_type(texture_path):
+    """
+    Extract the ChannelType name from a texture file path.
+
+    The file name is expected to end with _{channelName}.png.
+    Maps 'ambientOcclusion' back to 'AO' to match ChannelType enum names.
+
+    Returns:
+        str | None: The channel type name, or None if the path is malformed.
+    """
+    last_underscore = texture_path.rfind("_")
+    ext_index = texture_path.rfind(".png")
+    if last_underscore == -1 or ext_index == -1:
+        return None
+    channel = texture_path[last_underscore + 1:ext_index].split(".")[0]
+    return 'AO' if channel == 'ambientOcclusion' else channel
+
 
 class TextureImporter:
-    """
-    Responsible for importing textures from the file paths.
-    """
+    """Imports texture files into the project shelf."""
 
     def import_textures(self, textures_to_import):
         """
-        Import the textures from the specified paths.
+        Import textures from an export result into the project.
 
         Args:
-            textures_to_import (object): The exported textures to be imported.
+            textures_to_import: Export result object with a .textures dict.
 
         Returns:
-            dict: A dictionary with the imported texture resources keyed by their respective paths.
+            dict: Imported texture resources keyed by file path.
         """
         imported_textures = {}
-        texture_paths = []
-
-        for texture_list_key in textures_to_import.textures.keys():
-            current_texture_list = textures_to_import.textures[texture_list_key]
-
-            for texture_path in current_texture_list:
-                texture_paths.append(texture_path)  # Collect texture paths for cleanup later
-                texture_resource = resource.import_project_resource(texture_path, resource.Usage.TEXTURE)
+        for texture_list in textures_to_import.textures.values():
+            for texture_path in texture_list:
+                texture_resource = resource.import_project_resource(
+                    texture_path, resource.Usage.TEXTURE
+                )
                 imported_textures[texture_path] = texture_resource
-
-        return imported_textures, texture_paths
-
-
-class ChannelTypeExtractor:
-    """
-    Responsible for extracting the channel type from the texture file path.
-    """
-
-    def extract_channel_type(self, texture_path):
-        """
-        Extract the channel type from the texture file path.
-
-        Args:
-            texture_path (str): The file path of the texture.
-
-        Returns:
-            str: The extracted channel type.
-        """
-        last_underscore_index = texture_path.rfind("_")
-        extension_index = texture_path.rfind(".png")
-        if last_underscore_index != -1 and extension_index != -1:
-            channel_type_string = texture_path[last_underscore_index + 1:extension_index]
-            channel_type_string = channel_type_string.split(".")[0]
-            if channel_type_string == 'ambientOcclusion':
-                channel_type_string = 'AO'
-            return channel_type_string
-        return None
+        return imported_textures
 
 
 class LayerTextureAssigner:
-    """
-    Responsible for assigning imported textures to the correct channels in a fill layer.
-    """
+    """Assigns imported textures to the correct channels of a fill layer."""
 
     def assign_textures_to_layer(self, new_layer, imported_textures):
         """
-        Assign the imported textures to the correct channels in the new fill layer.
+        Set each imported texture as the source for its corresponding channel.
 
         Args:
-            new_layer (object): The fill layer where the textures will be assigned.
-            imported_textures (dict): A dictionary of imported texture resources keyed by their file paths.
+            new_layer: The fill layer to assign textures to.
+            imported_textures (dict): Resources keyed by file path.
         """
-        extractor = ChannelTypeExtractor()
-
         for texture_path, texture_resource in imported_textures.items():
-            channel_type_string = extractor.extract_channel_type(texture_path)
-
-            if channel_type_string:
-                print(f"Assigning texture to channel: {channel_type_string}")
-                channel_type = getattr(layerstack.ChannelType, channel_type_string)
+            channel_name = _extract_channel_type(texture_path)
+            if channel_name:
+                channel_type = getattr(layerstack.ChannelType, channel_name)
                 new_layer.set_source(channel_type, texture_resource.identifier())
-
-        print("Textures imported and assigned to the new fill layer.")
-        
-
-
-class ResourceCleaner:
-    """
-    Manages the cleanup of texture files after they are imported and assigned.
-    """
-    
-    def delete_texture_files(self, texture_paths):
-        """
-        Deletes the texture files from disk after they have been imported.
-
-        Args:
-            texture_paths (list): List of texture file paths to delete.
-        """
-        for texture_path in texture_paths:
-            try:
-                os.remove(texture_path)
-                print(f"Deleted file: {texture_path}")
-            except Exception as e:
-                print(f"Error deleting file {texture_path}: {e}")
 
 
 class TextureAssignmentManager:
-    """
-    Manages the process of importing exported textures into a new fill layer and assigning them to the appropriate channels.
-    """
+    """Orchestrates importing exported textures and assigning them to a fill layer."""
 
     def __init__(self):
-        self.texture_importer = TextureImporter()
-        self.layer_assigner = LayerTextureAssigner()
-        #self.resource_cleaner = ResourceCleaner()
+        self._importer = TextureImporter()
+        self._assigner = LayerTextureAssigner()
 
     def import_and_assign_textures(self, new_layer, textures_to_import):
         """
-        Import the exported textures into a new fill layer and assign them to the correct channels.
+        Import textures from an export result and assign them to a fill layer.
 
         Args:
-            new_layer (object): The fill layer where the textures will be assigned.
-            textures_to_import (object): The exported textures to be imported.
+            new_layer: The fill layer to populate.
+            textures_to_import: Export result object.
         """
-        imported_textures, texture_paths = self.texture_importer.import_textures(textures_to_import)
-        self.layer_assigner.assign_textures_to_layer(new_layer, imported_textures)
-        #self.resource_cleaner.delete_texture_files(texture_paths)                                #do not uncomment
+        imported_textures = self._importer.import_textures(textures_to_import)
+        self._assigner.assign_textures_to_layer(new_layer, imported_textures)
 
 
 class ExportConfigGenerator:
-    """
-    Generates the export configuration for the active texture set.
-    """
+    """Builds the export configuration dict for the active texture set."""
 
     def __init__(self, export_path, preset_name="Current channels Export"):
         self.export_path = export_path
         self.preset_name = preset_name
 
-    def generate_current_channels_maps_export(self):
-        current_stack = textureset.get_active_stack()
-        texture_set_info_manager = vg_project_info.TextureSetInfo(current_stack)
-        current_textureset_info = texture_set_info_manager.fetch_texture_set_info_from_stack()
+    def generate_export_config(self):
+        """Return a complete export configuration dict."""
+        ts_info = vg_project_info.TextureSetInfo().get_info()
 
-        udim_suffix = ""
-        current_texture_set = current_textureset_info["Texture Set"]
-        if current_texture_set.has_uv_tiles():
-            udim_suffix = '.$udim'
-
-        raw_channels_list = current_textureset_info["Channels"]
-        channels_names = [element.name for element in raw_channels_list]
+        udim_suffix = '.$udim' if ts_info.texture_set.has_uv_tiles() else ''
         channels_names = [
-            'ambientOcclusion' if element.name == 'AO' else element.name
-            for element in raw_channels_list
+            'ambientOcclusion' if ch.name == 'AO' else ch.name
+            for ch in ts_info.channels
         ]
 
-        current_channels_info = []
-
+        maps = []
         for channel_name in channels_names:
-            channels_info = [
-                {
-                    "destChannel": channel,
-                    "srcChannel": channel,
-                    "srcMapType": "DocumentMap",
-                    "srcMapName": channel_name
-                } for channel in "RGBA"
-            ]
-
-            current_filename = f'$mesh_$textureSet_{channel_name}'
-            current_filename = current_filename + udim_suffix
-
-            current_channels_info.append({
-                'fileName': current_filename,
-                'channels': channels_info,
+            maps.append({
+                'fileName': f'$mesh_$textureSet_{channel_name}{udim_suffix}',
+                'channels': [
+                    {
+                        "destChannel": c,
+                        "srcChannel": c,
+                        "srcMapType": "DocumentMap",
+                        "srcMapName": channel_name,
+                    }
+                    for c in "RGBA"
+                ],
                 'parameters': {
                     'bitDepth': '8',
                     'dithering': False,
-                    'fileFormat': 'png'
-                }
+                    'fileFormat': 'png',
+                },
             })
 
-        return current_channels_info
-
-    def generate_export_config(self):
-        current_channels_export_preset = {
-            "name": self.preset_name,
-            "maps": self.generate_current_channels_maps_export()
-        }
-
-        texture_set_info_manager = vg_project_info.TextureSetInfo()
-        current_textureset_info = texture_set_info_manager.fetch_texture_set_info_from_stack()
-
-        export_config = {
+        return {
             "exportPath": self.export_path,
             "exportShaderParams": False,
             "defaultExportPreset": self.preset_name,
-            "exportPresets": [current_channels_export_preset],
-            "exportList": [{"rootPath": current_textureset_info["Name"]}],
+            "exportPresets": [{"name": self.preset_name, "maps": maps}],
+            "exportList": [{"rootPath": ts_info.name}],
             "exportParameters": [
                 {"parameters": {"dithering": True, "paddingAlgorithm": "infinite"}}
             ],
-            "uvTiles": current_textureset_info["UV Tiles coordinates"],
+            "uvTiles": ts_info.uv_tiles_coordinates,
         }
-        return export_config
 
 
 class TextureExporter:
-    """
-    Handles the export of textures using a given export configuration.
-    """
+    """Executes a texture export using a given configuration dict."""
 
     def export_textures(self, export_config):
+        """
+        Run the export and return the result, or None on failure.
+
+        Args:
+            export_config (dict): Export configuration.
+
+        Returns:
+            ExportResult | None
+        """
         try:
             export_result = export.export_project_textures(export_config)
-
             if export_result.status == export.ExportStatus.Error:
                 print("Error during texture export:", export_result.message)
                 return None
-            else:
-                print("Export successful!")
-                return export_result
-
+            return export_result
         except Exception as e:
             print(f"Error during texture export: {e}")
             return None
@@ -235,85 +170,27 @@ class TextureExporter:
 
 ##### FUNCTIONS USING THE CLASSES #####
 
+def _apply_textures_to_new_layer(stack_manager, exported_textures):
+    """Create a Normal-blend fill layer on top of the stack and populate it with exported textures."""
+    new_layer = stack_manager.add_layer("fill", layer_position="On Top", layer_name="Stack layer")
+    for channel in new_layer.active_channels:
+        new_layer.set_blending_mode(BLENDING_NORMAL, channel)
+    TextureAssignmentManager().import_and_assign_textures(new_layer, exported_textures)
+
+
 def create_layer_from_stack():
-    """Generate a layer from the visible content in the stack."""
-    
-    # Generate the export configuration
-    export_path = export.get_default_export_path()
-    config_generator = ExportConfigGenerator(export_path)
-    export_config = config_generator.generate_export_config()
-
-    # Perform the export
-    exporter = TextureExporter()
-    exported_textures = exporter.export_textures(export_config)
-
-    # Import the textures to a new layer
+    """Export the visible stack content and import it as a new fill layer on top."""
+    export_config = ExportConfigGenerator(export.get_default_export_path()).generate_export_config()
+    exported_textures = TextureExporter().export_textures(export_config)
     if exported_textures:
-        texture_manager = TextureAssignmentManager()
-        current_stack_manager = vg_layerstack.LayerManager()
-
-        new_layer = current_stack_manager.add_layer("fill", layer_position="On Top", layer_name="Stack layer")
-        new_layer.active_channels = set(new_layer.active_channels)
-        
-        for new_layer_channel in new_layer.active_channels:
-            normal_blending = layerstack.BlendingMode(2)
-            new_layer.set_blending_mode(normal_blending, new_layer_channel)
-        
-        texture_manager.import_and_assign_textures(new_layer, exported_textures)
+        _apply_textures_to_new_layer(vg_layerstack.LayerManager(), exported_textures)
 
 
 def flatten_stack():
-    """Flatten the stack by exporting and importing textures."""
-    
-    export_path = export.get_default_export_path()
-    config_generator = ExportConfigGenerator(export_path)
-
-    # Generate the export configuration
-    export_config = config_generator.generate_export_config()
-
-    # Perform the export
-    exporter = TextureExporter()
+    """Flatten the stack by exporting its content, deleting all layers, and re-importing as a single fill layer."""
+    export_config = ExportConfigGenerator(export.get_default_export_path()).generate_export_config()
     stack_manager = vg_layerstack.LayerManager()
-    exported_textures = exporter.export_textures(export_config)
-    
-    stack_manager.delete_stack_content() #delete before to reimport
-
-    # Import the textures to a new layer
+    exported_textures = TextureExporter().export_textures(export_config)
+    stack_manager.delete_stack_content()
     if exported_textures:
-        texture_manager = TextureAssignmentManager()
-        new_layer = stack_manager.add_layer("fill", layer_position="On Top", layer_name="Stack layer")
-        new_layer.active_channels = set(new_layer.active_channels)
-        
-        for new_layer_channel in new_layer.active_channels:
-            normal_blending = layerstack.BlendingMode(2)
-            new_layer.set_blending_mode(normal_blending, new_layer_channel)
-        
-        texture_manager.import_and_assign_textures(new_layer, exported_textures)
-        
-
-#####################################
-
-if __name__ == "__main__":
-    # Initialize the export configuration generator
-    export_path = export.get_default_export_path()
-    config_generator = ExportConfigGenerator(export_path)
-
-    # Generate the export configuration
-    export_config = config_generator.generate_export_config()
-
-    # Perform the export
-    exporter = TextureExporter()
-    exported_textures = exporter.export_textures(export_config)
-
-    # Import the textures to a new layer
-    if exported_textures:
-        texture_manager = TextureAssignmentManager()
-        current_stack_manager = vg_layerstack.LayerManager()
-        new_layer = current_stack_manager.add_layer("fill", layer_position="On Top", layer_name="Stack layer")
-        new_layer.active_channels = set(new_layer.active_channels)
-        
-        for new_layer_channel in new_layer.active_channels:
-            normal_blending = layerstack.BlendingMode(2)
-            new_layer.set_blending_mode(normal_blending, new_layer_channel)
-        
-        texture_manager.import_and_assign_textures(new_layer, exported_textures)
+        _apply_textures_to_new_layer(stack_manager, exported_textures)

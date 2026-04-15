@@ -1,53 +1,51 @@
 ##########################################################################
-# 
+#
 # Copyright 2010-2024 Vincent GAULT - Adobe
 # All Rights Reserved.
 #
 ##########################################################################
 
 """
-This module contains different utilities related to mesh maps baking in Substance 3D Painter.
+This module contains different utilities related to mesh maps baking in
+Substance 3D Painter.
 """
 __author__ = "Vincent GAULT - Adobe"
 
 # Modules import
 import math
+from PySide6.QtCore import QTimer
 from substance_painter import baking, textureset, ui, event
 from vg_pt_utils import vg_project_info
-from substance_painter.baking import BakingParameters
+
+# Mesh maps baked by quick_bake().
+# Values correspond to textureset.MeshMapUsage enum members:
+# Normal, WorldSpaceNormal, AO, Curvature, Height, ID, Opacity
+QUICK_BAKE_MESH_MAPS = [1, 2, 3, 4, 5, 8, 9]
 
 
 class BakingParameterConfigurator:
     """
-    Responsible for configuring baking parameters based on the texture set information.
+    Configures baking parameters for a given texture set.
     """
 
-    #Build a list of the mesh maps to bake for the baking params
-    def mesh_maps_to_bake_list(self, id_list: list):
-        map_id_list = id_list
-        map_usage_list = [textureset.MeshMapUsage(id) for id in id_list]
-        return map_usage_list
-
-    
     def configure_baking_parameters(self, textureset_name, width, height, mesh_maps_to_bake):
         """
-        Configure the baking parameters based on the texture set name and resolution.
+        Build and return BakingParameters configured for the given texture set.
 
         Args:
-            textureset_name (str): The name of the texture set.
-            width (int): The width of the texture set in log2 format.
-            height (int): The height of the texture set in log2 format.
+            textureset_name (str): Name of the texture set.
+            width (int): Output width in log2 format.
+            height (int): Output height in log2 format.
+            mesh_maps_to_bake (list[int]): MeshMapUsage values to enable.
 
         Returns:
             BakingParameters: Configured baking parameters.
         """
-        
-        baking_params = BakingParameters.from_texture_set_name(textureset_name)
+        baking_params = baking.BakingParameters.from_texture_set_name(textureset_name)
         common_params = baking_params.common()
         baking_params.set({common_params['OutputSize']: (width, height)})
-        map_usage_list = self.mesh_maps_to_bake_list(mesh_maps_to_bake)
 
-        # Activate proper bakers
+        map_usage_list = [textureset.MeshMapUsage(id) for id in mesh_maps_to_bake]
         baking_params.set_enabled_bakers(map_usage_list)
 
         return baking_params
@@ -55,72 +53,47 @@ class BakingParameterConfigurator:
 
 class BakingProcessManager:
     """
-    Responsible for managing the baking process and handling related events.
+    Starts the baking process and handles the return to paint view on completion.
     """
 
-    def __init__(self):
-        self._current_baking_settings = None
+    def _switch_to_paint_view(self):
+        """Switch to paint view after baking completes."""
+        ui.switch_to_mode(ui.UIMode(1))
 
-    def switch_to_paint_view(self, e):
+    def _on_baking_ended(self, e):
         """
-        Event handler for when the baking process ends. Switches to paint view.
+        Event handler for BakingProcessEnded.
+        Defers the UI mode switch to the Qt main loop to avoid threading issues.
         """
-        print("Switching to paint view...")
-        paint_mode = ui.UIMode(1)
-        ui.switch_to_mode(paint_mode)
-        print("Paint view activated.")
-        
-        event.DISPATCHER.disconnect(event.BakingProcessEnded, self.switch_to_paint_view)
+        event.DISPATCHER.disconnect(event.BakingProcessEnded, self._on_baking_ended)
+        QTimer.singleShot(0, self._switch_to_paint_view)
 
     def start_baking(self, current_texture_set):
         """
-        Starts the baking process and connects the event handler.
+        Start the async baking process for the given texture set.
 
         Args:
-            current_texture_set (object): The current texture set to bake.
+            current_texture_set (TextureSet): The texture set to bake.
         """
-        # Connect the event to the function to switch to the paint view
-        event.DISPATCHER.connect_strong(event.BakingProcessEnded, self.switch_to_paint_view)
-
-        # Start baking process
+        event.DISPATCHER.connect_strong(event.BakingProcessEnded, self._on_baking_ended)
         baking.bake_async(current_texture_set)
-        print("Baking started...")
-
-
-
-
-
 
 
 ##################### FUNCTIONS #####################
 
 def quick_bake():
     """
-    Perform a quick bake using the current texture set information and configured parameters.
+    Bake mesh maps for the active texture set using its current resolution.
     """
-    # Fetch texture set information
-    export_manager = vg_project_info.TextureSetInfo()
-    textureset_info = export_manager.fetch_texture_set_info_from_stack()        
-    textureset_name = textureset_info["Name"]
-    current_texture_set = textureset_info["Texture Set"]
-    
-    # Calculate texture resolution in log2 format
-    current_resolution = current_texture_set.get_resolution()
+    ts_info = vg_project_info.TextureSetInfo().get_info()
+
+    current_resolution = ts_info.texture_set.get_resolution()
     width = int(math.log2(current_resolution.width))
     height = int(math.log2(current_resolution.height))
 
-    # Get the current baking parameters to retrieve user-selected maps
-    current_baking_params = BakingParameters.from_texture_set_name(textureset_name)
-    enabled_bakers = current_baking_params.get_enabled_bakers()
-    
-    # Configure baking parameters
-    baking_param_configurator = BakingParameterConfigurator()
-    baking_params = baking_param_configurator.configure_baking_parameters(textureset_name, width, height, enabled_bakers)
+    configurator = BakingParameterConfigurator()
+    configurator.configure_baking_parameters(
+        ts_info.name, width, height, QUICK_BAKE_MESH_MAPS
+    )
 
-    # Start baking
-    baking_process_manager = BakingProcessManager()
-    baking_process_manager.start_baking(current_texture_set)
-
-
-if __name__ == "__main__":
-    quick_bake()
+    BakingProcessManager().start_baking(ts_info.texture_set)
