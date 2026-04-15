@@ -17,7 +17,7 @@ from PySide6.QtCore import QTimer
 from substance_painter import baking, textureset, ui, event
 from vg_pt_utils import vg_project_info
 
-# Mesh maps baked by quick_bake().
+# Mesh maps baked by quick_bake() and bake_all_texture_sets().
 # Values correspond to textureset.MeshMapUsage enum members:
 # Normal, WorldSpaceNormal, AO, Curvature, Height, ID, Opacity
 QUICK_BAKE_MESH_MAPS = [1, 2, 3, 4, 5, 8, 9]
@@ -28,20 +28,23 @@ class BakingParameterConfigurator:
     Configures baking parameters for a given texture set.
     """
 
-    def configure_baking_parameters(self, textureset_name, width, height, mesh_maps_to_bake):
+    def configure_baking_parameters(self, texture_set, mesh_maps_to_bake):
         """
         Build and return BakingParameters configured for the given texture set.
+        The output resolution is derived from the texture set's current resolution.
 
         Args:
-            textureset_name (str): Name of the texture set.
-            width (int): Output width in log2 format.
-            height (int): Output height in log2 format.
+            texture_set (TextureSet): The texture set to configure.
             mesh_maps_to_bake (list[int]): MeshMapUsage values to enable.
 
         Returns:
             BakingParameters: Configured baking parameters.
         """
-        baking_params = baking.BakingParameters.from_texture_set_name(textureset_name)
+        resolution = texture_set.get_resolution()
+        width = int(math.log2(resolution.width))
+        height = int(math.log2(resolution.height))
+
+        baking_params = baking.BakingParameters.from_texture_set(texture_set)
         common_params = baking_params.common()
         baking_params.set({common_params['OutputSize']: (width, height)})
 
@@ -68,15 +71,27 @@ class BakingProcessManager:
         event.DISPATCHER.disconnect(event.BakingProcessEnded, self._on_baking_ended)
         QTimer.singleShot(0, self._switch_to_paint_view)
 
+    def _connect_event(self):
+        event.DISPATCHER.connect_strong(event.BakingProcessEnded, self._on_baking_ended)
+
     def start_baking(self, current_texture_set):
         """
-        Start the async baking process for the given texture set.
+        Start the async baking process for a single texture set.
 
         Args:
             current_texture_set (TextureSet): The texture set to bake.
         """
-        event.DISPATCHER.connect_strong(event.BakingProcessEnded, self._on_baking_ended)
+        self._connect_event()
         baking.bake_async(current_texture_set)
+
+    def start_baking_all(self):
+        """
+        Start the async baking process for all enabled texture sets.
+        Texture sets must be enabled via BakingParameters.set_textureset_enabled()
+        before calling this method.
+        """
+        self._connect_event()
+        baking.bake_selected_textures_async()
 
 
 ##################### FUNCTIONS #####################
@@ -86,14 +101,18 @@ def quick_bake():
     Bake mesh maps for the active texture set using its current resolution.
     """
     ts_info = vg_project_info.TextureSetInfo().get_info()
-
-    current_resolution = ts_info.texture_set.get_resolution()
-    width = int(math.log2(current_resolution.width))
-    height = int(math.log2(current_resolution.height))
-
-    configurator = BakingParameterConfigurator()
-    configurator.configure_baking_parameters(
-        ts_info.name, width, height, QUICK_BAKE_MESH_MAPS
+    BakingParameterConfigurator().configure_baking_parameters(
+        ts_info.texture_set, QUICK_BAKE_MESH_MAPS
     )
-
     BakingProcessManager().start_baking(ts_info.texture_set)
+
+
+def bake_all_texture_sets():
+    """
+    Bake mesh maps for all texture sets in the project, each at its own resolution.
+    """
+    configurator = BakingParameterConfigurator()
+    for ts in textureset.all_texture_sets():
+        params = configurator.configure_baking_parameters(ts, QUICK_BAKE_MESH_MAPS)
+        params.set_textureset_enabled(True)
+    BakingProcessManager().start_baking_all()

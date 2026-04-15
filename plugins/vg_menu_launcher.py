@@ -113,8 +113,12 @@ def create_ref_point_layer():
 ### QUICK BAKE ###
 
 def launch_quick_bake():
-    """Quickly bake mesh maps of the current texture set."""
+    """Bake mesh maps of the current texture set."""
     vg_baking.quick_bake()
+
+def launch_bake_all():
+    """Bake mesh maps for all texture sets in the project."""
+    vg_baking.bake_all_texture_sets()
     
     
 #################################################################
@@ -149,6 +153,7 @@ def create_menu():
         ("Create Reference Point Layer", create_ref_point_layer, "Ctrl+R"),
         None,  # Separator
         ("Quick Bake", launch_quick_bake, "Ctrl+B"),
+        ("Bake All Texture Sets", launch_bake_all, "Ctrl+Shift+B"),
     ]
 
     # Add actions and separators to the menu
