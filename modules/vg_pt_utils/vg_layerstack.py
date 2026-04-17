@@ -122,15 +122,17 @@ class LayerManager:
 
     REF_POINT_BASE_NAME = "REF POINT LAYER"
 
-    def get_next_ref_point_name(self):
+    def get_next_ref_point_name(self, base_name=None):
         """
-        Return the next available ref point layer name based on the default
-        base name, using the highest existing suffix number + 1.
+        Return the next available ref point layer name based on *base_name*
+        (or the class default if omitted), using the highest existing suffix + 1.
 
         For example, if 'REF POINT LAYER_01' and 'REF POINT LAYER_06' exist,
         the next suggested name will be 'REF POINT LAYER_07'.
         """
-        pattern = re.compile(rf"^{re.escape(self.REF_POINT_BASE_NAME)}_(\d+)$")
+        if base_name is None:
+            base_name = self.REF_POINT_BASE_NAME
+        pattern = re.compile(rf"^{re.escape(base_name)}_(\d+)$")
         all_nodes = layerstack.get_root_layer_nodes(self.current_stack)
 
         numbers = []
@@ -145,7 +147,7 @@ class LayerManager:
                         numbers.append(int(match.group(1)))
 
         next_number = max(numbers) + 1 if numbers else 1
-        return f"{self.REF_POINT_BASE_NAME}_{str(next_number).zfill(2)}"
+        return f"{base_name}_{str(next_number).zfill(2)}"
 
     def generate_ref_point_layer(self, layer_name=None):
         """

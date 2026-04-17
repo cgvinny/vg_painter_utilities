@@ -11,6 +11,7 @@ in Substance 3D Painter, used to flatten or snapshot the layer stack.
 """
 __author__ = "Vincent GAULT - Adobe"
 
+import os
 from substance_painter import export, textureset, resource, layerstack
 from vg_pt_utils import vg_layerstack, vg_project_info
 from vg_pt_utils.vg_layerstack import BLENDING_NORMAL
@@ -50,7 +51,7 @@ class TextureImporter:
         imported_textures = {}
         for texture_list in textures_to_import.textures.values():
             for texture_path in texture_list:
-                texture_resource = resource.import_project_resource(
+                texture_resource = resource.import_session_resource(
                     texture_path, resource.Usage.TEXTURE
                 )
                 imported_textures[texture_path] = texture_resource
@@ -84,7 +85,8 @@ class TextureAssignmentManager:
 
     def import_and_assign_textures(self, new_layer, textures_to_import):
         """
-        Import textures from an export result and assign them to a fill layer.
+        Import textures from an export result, assign them to a fill layer,
+        then delete the source PNG files from disk.
 
         Args:
             new_layer: The fill layer to populate.
@@ -92,6 +94,11 @@ class TextureAssignmentManager:
         """
         imported_textures = self._importer.import_textures(textures_to_import)
         self._assigner.assign_textures_to_layer(new_layer, imported_textures)
+        for texture_path in imported_textures:
+            try:
+                os.remove(texture_path)
+            except OSError as e:
+                print(f"Warning: could not delete texture file '{texture_path}': {e}")
 
 
 class ExportConfigGenerator:
@@ -184,6 +191,60 @@ def create_layer_from_stack():
     exported_textures = TextureExporter().export_textures(export_config)
     if exported_textures:
         _apply_textures_to_new_layer(vg_layerstack.LayerManager(), exported_textures)
+
+
+def create_layer_from_group():
+    """
+    Export the selected group's content in isolation and import it as a new
+    fill layer placed just above the group.
+
+    All other root-level layers are temporarily hidden during export, then
+    restored — including on error. Layers inside the group are untouched.
+
+    Note: if the group uses a non-Normal blending mode, the exported result
+    reflects the group composited over a transparent background, not over
+    the full stack.
+    """
+    current_stack = textureset.get_active_stack()
+    selected = layerstack.get_selected_nodes(current_stack)
+
+    if len(selected) != 1:
+        print("VG: select exactly one group layer to use this function.")
+        return
+    target_group = selected[0]
+    if target_group.get_type() != layerstack.NodeType.GroupLayer:
+        print("VG: the selected layer is not a group.")
+        return
+
+    group_name = target_group.get_name()
+    root_nodes = layerstack.get_root_layer_nodes(current_stack)
+    saved_visibility = [(node, node.is_visible()) for node in root_nodes]
+
+    success = False
+    try:
+        for node in root_nodes:
+            node.set_visible(node == target_group)
+
+        export_config = ExportConfigGenerator(export.get_default_export_path()).generate_export_config()
+        exported_textures = TextureExporter().export_textures(export_config)
+
+        if exported_textures:
+            layerstack.set_selected_nodes([target_group])
+            stack_manager = vg_layerstack.LayerManager()
+            new_layer = stack_manager.add_layer(
+                "fill", layer_position="Above", layer_name=f"{group_name} [Baked]"
+            )
+            for channel in new_layer.active_channels:
+                new_layer.set_blending_mode(BLENDING_NORMAL, channel)
+            TextureAssignmentManager().import_and_assign_textures(new_layer, exported_textures)
+            success = True
+    finally:
+        for node, was_visible in saved_visibility:
+            node.set_visible(was_visible)
+        layerstack.set_selected_nodes(selected)
+
+    if success:
+        target_group.set_visible(False)
 
 
 def flatten_stack():
