@@ -31,7 +31,19 @@ _RELEASES_URL  = "https://github.com/cgvinny/vg_painter_utilities/releases"
 _LICENSE_URL   = "https://github.com/cgvinny/vg_painter_utilities/blob/main/LICENSE"
 _API_LATEST    = f"https://api.github.com/repos/{_REPO}/releases/latest"
 
-_VERSION_FILE  = pathlib.Path(__file__).parent.parent.parent / "VERSION"
+def _find_version_file() -> pathlib.Path:
+    # Resolve first to handle symlinks and normalise __pycache__ .pyc paths.
+    base = pathlib.Path(__file__).resolve()
+    # Walk up until we find a directory that contains "VERSION", up to 5 levels.
+    for _ in range(5):
+        base = base.parent
+        candidate = base / "VERSION"
+        if candidate.exists():
+            return candidate
+    # Fallback: expected location relative to module (may not exist)
+    return pathlib.Path(__file__).resolve().parent.parent.parent / "VERSION"
+
+_VERSION_FILE = _find_version_file()
 
 
 # ---------------------------------------------------------------------------
@@ -43,6 +55,7 @@ def read_version() -> str:
     try:
         return _VERSION_FILE.read_text(encoding="utf-8").strip()
     except Exception:
+        logging.warning(f"VG About: VERSION file not found at '{_VERSION_FILE}'")
         return "unknown"
 
 
@@ -110,7 +123,10 @@ class AboutDialog(QtWidgets.QDialog):
         super().__init__(parent or ui.get_main_window())
         self.setWindowTitle("About VG Painter Utilities")
         self.setFixedWidth(400)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        self.setWindowFlags(
+            (self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+            | Qt.WindowCloseButtonHint
+        )
         self._worker: _UpdateWorker | None = None
         self._build_ui()
 
@@ -241,7 +257,10 @@ class AboutDialog(QtWidgets.QDialog):
     def _on_check_done(self, result: dict | None):
         self._check_btn.setEnabled(True)
         if result is None:
-            self._update_lbl.setText('<font color="#888">Could not reach GitHub.</font>')
+            self._update_lbl.setText(
+                '<font color="#888">Could not reach GitHub.<br>'
+                'Check your network or firewall settings.</font>'
+            )
         elif result["is_newer"]:
             self._update_lbl.setText(
                 f'<font color="#f0a030">&#9679; Version {result["version"]} available — </font>'

@@ -101,11 +101,18 @@ class SettingsDialog(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(page)
         layout.setContentsMargins(8, 8, 8, 4)
 
-        layout.addWidget(QtWidgets.QLabel("<b>Keyboard Shortcuts</b>"))
+        header_row = QtWidgets.QHBoxLayout()
+        header_row.addWidget(QtWidgets.QLabel("<b>Keyboard Shortcuts</b>"))
+        header_row.addStretch()
+        restore_btn = QtWidgets.QPushButton("Restore Defaults")
+        restore_btn.setToolTip("Reset all shortcuts to their factory defaults")
+        restore_btn.clicked.connect(self._restore_defaults)
+        header_row.addWidget(restore_btn)
+        layout.addLayout(header_row)
 
         legend = QtWidgets.QLabel(
             '<font color="#55aa55">&#10003;</font> OK &nbsp;&nbsp;'
-            '<font color="#e07b39">&#9888;</font> Conflict with Painter &nbsp;&nbsp;'
+            '<font color="#e07b39">&#9888;</font> Potential conflict &nbsp;&nbsp;'
             '<font color="#cc4444">&#10006;</font> Conflict within plugin'
         )
         legend.setTextFormat(Qt.RichText)
@@ -211,6 +218,13 @@ class SettingsDialog(QtWidgets.QDialog):
             sc_lower = sc.lower()
             duplicates = [a for a in seen.get(sc_lower, []) if a != action_id]
 
+            raw_mod = next(
+                (k for k, v in vg_settings.MODIFIER_DISPLAY.items()
+                 if v == mod_combo.currentText()), ""
+            )
+            is_bare_shift  = (raw_mod == "Shift")
+            is_no_modifier = (raw_mod == "")
+
             if duplicates:
                 other = vg_settings.ACTION_LABELS.get(duplicates[0], duplicates[0])
                 status_lbl.setText(
@@ -220,6 +234,14 @@ class SettingsDialog(QtWidgets.QDialog):
                 other = self._painter_shortcuts[sc_lower]
                 status_lbl.setText(
                     f'<font color="#e07b39">&#9888; "{other}"</font>'
+                )
+            elif is_no_modifier:
+                status_lbl.setText(
+                    '<font color="#e07b39">&#9888; May conflict with Painter\'s tool keys</font>'
+                )
+            elif is_bare_shift:
+                status_lbl.setText(
+                    '<font color="#e07b39">&#9888; Painter may intercept Shift alone</font>'
                 )
             else:
                 status_lbl.setText('<font color="#55aa55">&#10003;</font>')
@@ -237,8 +259,19 @@ class SettingsDialog(QtWidgets.QDialog):
         return vg_settings.build_shortcut_string(raw_mod, key)
 
     # ------------------------------------------------------------------
-    # Navigation and save
+    # Navigation, restore and save
     # ------------------------------------------------------------------
+
+    def _restore_defaults(self):
+        """Reset all shortcut combo boxes to factory defaults."""
+        defaults = vg_settings.DEFAULT_SETTINGS["shortcuts"]
+        for action_id, (mod_combo, key_combo, _) in self._rows.items():
+            sc = defaults.get(action_id, {"modifier": "", "key": ""})
+            mod_display = vg_settings.MODIFIER_DISPLAY.get(sc.get("modifier", ""), "(none)")
+            mod_combo.setCurrentText(mod_display)
+            key = sc.get("key", "").upper()
+            key_combo.setCurrentText(key if key in _KEYS else "(none)")
+        self._validate_all()
 
     def _on_nav_changed(self, index):
         self._pages.setCurrentIndex(index)

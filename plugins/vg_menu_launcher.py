@@ -105,6 +105,11 @@ def create_layer_from_group():
     vg_export.create_layer_from_group()
 
 
+def create_id_map_from_group():
+    """Export the selected group as an ID map and assign it to the ID mesh map slot."""
+    vg_export.create_id_map_from_group()
+
+
 def flatten_stack():
     """Flatten the stack by exporting and importing textures."""
     vg_export.flatten_stack()
@@ -198,9 +203,13 @@ def open_settings():
     from vg_pt_utils.vg_settings_dialog import SettingsDialog
     dlg = SettingsDialog(ui.get_main_window())
     if dlg.exec() == QtWidgets.QDialog.Accepted:
-        for widget in plugin_menus_widgets:
+        # Preserve dock widgets (e.g. the Collections panel) across the menu rebuild.
+        docks = [w for w in plugin_menus_widgets if w is _collection_dock]
+        menus = [w for w in plugin_menus_widgets if w not in docks]
+        for widget in menus:
             ui.delete_ui_element(widget)
         plugin_menus_widgets.clear()
+        plugin_menus_widgets.extend(docks)
         create_menu()
 
 
@@ -216,6 +225,7 @@ _ACTION_FUNCS = {
     "add_mask_popup":           lambda: add_mask_popup(),
     "create_layer_from_stack":  lambda: create_layer_from_stack(),
     "create_layer_from_group":  lambda: create_layer_from_group(),
+    "create_id_map_from_group": lambda: create_id_map_from_group(),
     "flatten_stack":            lambda: flatten_stack(),
     "create_ref_point_layer":   lambda: create_ref_point_layer(),
     "launch_quick_bake":        lambda: launch_quick_bake(),
@@ -236,6 +246,7 @@ _MENU_STRUCTURE = [
     None,
     "create_layer_from_stack",
     "create_layer_from_group",
+    "create_id_map_from_group",
     "flatten_stack",
     None,
     "create_ref_point_layer",
@@ -296,6 +307,7 @@ def create_menu():
 def start_plugin():
     """Called when the plugin is started."""
     create_menu()
+    vg_collection.flush_pending_deletions()
     logging.info("VG Menu Activated")
     QTimer.singleShot(8000, _run_startup_update_check)
     

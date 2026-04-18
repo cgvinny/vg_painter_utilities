@@ -31,6 +31,8 @@ from typing import List, Optional
 
 from substance_painter import layerstack, textureset, project, colormanagement, logging
 
+from vg_pt_utils import vg_settings
+
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
@@ -179,11 +181,12 @@ def load_collection(folder_path: pathlib.Path) -> Optional[Collection]:
 
 def list_collections() -> List[Collection]:
     """Return all valid collections found in the collections directory, sorted by name."""
+    pending = set(vg_settings.load_settings().get("pending_delete_collections", []))
     result = []
     for folder in sorted(collections_dir().iterdir()):
         if folder.is_dir():
             col = load_collection(folder)
-            if col is not None:
+            if col is not None and col.name not in pending:
                 result.append(col)
     return result
 
@@ -220,6 +223,36 @@ def delete_collection(collection_name: str) -> bool:
 
     shutil.rmtree(folder)
     return True
+
+
+def mark_for_deletion(collection_name: str) -> None:
+    """Record a collection as pending deletion for the next Painter startup."""
+    settings = vg_settings.load_settings()
+    pending = settings.setdefault("pending_delete_collections", [])
+    if collection_name not in pending:
+        pending.append(collection_name)
+    vg_settings.save_settings(settings)
+
+
+def flush_pending_deletions() -> None:
+    """Attempt to delete collections marked for deletion. Silently skips any still locked."""
+    settings = vg_settings.load_settings()
+    pending = settings.get("pending_delete_collections", [])
+    if not pending:
+        return
+
+    remaining = []
+    for name in pending:
+        try:
+            delete_collection(name)
+            logging.info(f"VG Collections: deferred deletion of '{name}' completed.")
+        except PermissionError:
+            remaining.append(name)
+        except Exception as e:
+            logging.warning(f"VG Collections: could not delete pending collection '{name}': {e}")
+
+    settings["pending_delete_collections"] = remaining
+    vg_settings.save_settings(settings)
 
 
 def duplicate_collection(source_name: str, new_name: str) -> pathlib.Path:

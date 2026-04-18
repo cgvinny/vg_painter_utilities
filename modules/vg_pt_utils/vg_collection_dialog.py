@@ -1119,9 +1119,8 @@ class CollectionPanel(QtWidgets.QWidget):
         if reply == QtWidgets.QMessageBox.Yes:
             try:
                 vg_collection.delete_collection(collection.name)
-            except PermissionError as e:
-                QtWidgets.QMessageBox.warning(self, "Cannot Delete", str(e))
-                return
+            except PermissionError:
+                vg_collection.mark_for_deletion(collection.name)
             except Exception as e:
                 QtWidgets.QMessageBox.critical(self, "Delete Error", str(e))
                 return
