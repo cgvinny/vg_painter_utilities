@@ -326,6 +326,144 @@ def create_id_map_from_group():
         layerstack.set_selected_nodes(selected)
 
 
+def swap_id_map_color(source_color, target_color):
+    """
+    Replace source_color with target_color in the active texture set's ID map.
+
+    Builds a temporary group with the existing ID map as a fill layer at the
+    bottom and a new-color fill layer at the top masked by a Color Selection
+    effect targeting source_color. Exports the group as a new ID map, updates
+    the mesh map slot, then removes the temporary group.
+
+    Args:
+        source_color (colormanagement.Color): The ID color to replace.
+        target_color (colormanagement.Color): The replacement color.
+    """
+    from PySide6 import QtWidgets
+    from substance_painter import ui
+
+    current_stack = textureset.get_active_stack()
+    id_map_resource = current_stack.material().get_mesh_map_resource(textureset.MeshMapUsage.ID)
+
+    if id_map_resource is None:
+        QtWidgets.QMessageBox.warning(
+            ui.get_main_window(),
+            "ID Color Swap",
+            "No ID map found on this texture set. Bake an ID map first.",
+        )
+        return
+
+    root_nodes = layerstack.get_root_layer_nodes(current_stack)
+    saved_visibility = [(node, node.is_visible()) for node in root_nodes]
+    saved_selection = layerstack.get_selected_nodes(current_stack)
+
+    temp_group = None
+    texture_path = None
+    try:
+        # Create temp group at top of stack (root_nodes captured before insertion)
+        temp_pos = layerstack.InsertPosition.from_textureset_stack(current_stack)
+        temp_group = layerstack.insert_group(temp_pos)
+        temp_group.set_name("ID Color Swap [Temp]")
+
+        # Bottom fill layer: displays the existing ID map
+        id_layer_pos = layerstack.InsertPosition.inside_node(
+            temp_group, layerstack.NodeStack.Substack
+        )
+        id_layer = layerstack.insert_fill(id_layer_pos)
+        id_layer.set_name("ID Map")
+        id_layer.active_channels = {textureset.ChannelType.BaseColor}
+        id_layer.set_source(layerstack.ChannelType.BaseColor, id_map_resource)
+
+        # Top fill layer: the replacement color
+        color_layer_pos = layerstack.InsertPosition.above_node(id_layer)
+        color_layer = layerstack.insert_fill(color_layer_pos)
+        color_layer.set_name("New Color")
+        color_layer.active_channels = {textureset.ChannelType.BaseColor}
+        color_layer.set_source(layerstack.ChannelType.BaseColor, target_color)
+
+        # Black mask + Color Selection effect targeting source_color on the ID map
+        color_layer.add_mask(layerstack.MaskBackground.Black)
+        mask_pos = layerstack.InsertPosition.inside_node(
+            color_layer, layerstack.NodeStack.Mask
+        )
+        cs_effect = layerstack.insert_color_selection_effect(mask_pos)
+        default_params = cs_effect.get_parameters()
+        cs_effect.set_parameters(layerstack.ColorSelectionEffectParams(
+            id_mask=id_map_resource,
+            output_value=1.0,
+            hardness=default_params.hardness,
+            tolerance=default_params.tolerance,
+            background_color=layerstack.ColorSelectionBackgroundColor.Black,
+            colors=[source_color],
+        ))
+
+        # Hide all pre-existing root nodes so only temp_group is composited
+        for node in root_nodes:
+            node.set_visible(False)
+
+        # Export temp_group as a new ID map (BaseColor only)
+        layerstack.set_selected_nodes([temp_group])
+        ts_info = vg_project_info.TextureSetInfo().get_info()
+        udim_suffix = '.$udim' if ts_info.texture_set.has_uv_tiles() else ''
+
+        export_config = {
+            "exportPath": export.get_default_export_path(),
+            "exportShaderParams": False,
+            "defaultExportPreset": "ID Map Export",
+            "exportPresets": [{
+                "name": "ID Map Export",
+                "maps": [{
+                    "fileName": f"$mesh_$textureSet_ID{udim_suffix}",
+                    "channels": [
+                        {"destChannel": c, "srcChannel": c,
+                         "srcMapType": "DocumentMap", "srcMapName": "BaseColor"}
+                        for c in "RGBA"
+                    ],
+                    "parameters": {"bitDepth": "8", "dithering": False, "fileFormat": "png"},
+                }],
+            }],
+            "exportList": [{"rootPath": ts_info.name}],
+            "exportParameters": [{"parameters": {"dithering": False, "paddingAlgorithm": "infinite"}}],
+            "uvTiles": ts_info.uv_tiles_coordinates,
+        }
+
+        exported = TextureExporter().export_textures(export_config)
+        if not exported:
+            return
+
+        texture_paths = [p for paths in exported.textures.values() for p in paths]
+        if not texture_paths:
+            return
+
+        texture_path = texture_paths[0]
+        imported = resource.import_project_resource(texture_path, resource.Usage.TEXTURE)
+        ts_info.texture_set.set_mesh_map_resource(
+            textureset.MeshMapUsage.ID, imported.identifier()
+        )
+
+    except Exception as e:
+        QtWidgets.QMessageBox.critical(
+            ui.get_main_window(), "ID Color Swap", f"An error occurred:\n{e}"
+        )
+    finally:
+        if temp_group is not None:
+            try:
+                layerstack.delete_node(temp_group)
+            except Exception:
+                pass
+        for node, was_visible in saved_visibility:
+            try:
+                node.set_visible(was_visible)
+            except Exception:
+                pass
+        layerstack.set_selected_nodes(saved_selection)
+        if texture_path is not None:
+            try:
+                os.remove(texture_path)
+            except OSError:
+                pass
+
+
 def flatten_stack():
     """Flatten the stack by exporting its content, deleting all layers, and re-importing as a single fill layer."""
     export_config = ExportConfigGenerator(export.get_default_export_path()).generate_export_config()

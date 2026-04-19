@@ -110,6 +110,95 @@ def create_id_map_from_group():
     vg_export.create_id_map_from_group()
 
 
+def id_color_swap():
+    """Open a dialog to pick source and target colors, then swap them in the ID map."""
+    from PySide6 import QtGui, QtCore
+    from substance_painter import colormanagement
+
+    class _IDColorSwapDialog(QtWidgets.QDialog):
+        def __init__(self, parent=None):
+            super().__init__(parent)
+            self.setWindowTitle("ID Color Swap")
+            self.setFixedWidth(280)
+            self._source = QtGui.QColor.fromRgbF(1.0, 0.0, 0.0)
+            self._target = QtGui.QColor.fromRgbF(0.0, 1.0, 0.0)
+
+            layout = QtWidgets.QVBoxLayout(self)
+            layout.setSpacing(12)
+
+            swatches = QtWidgets.QHBoxLayout()
+            swatches.setSpacing(16)
+
+            self._src_btn = self._make_swatch_column(swatches, "Current color", self._source)
+            self._tgt_btn = self._make_swatch_column(swatches, "New color", self._target)
+            layout.addLayout(swatches)
+
+            self._src_btn.clicked.connect(self._pick_source)
+            self._tgt_btn.clicked.connect(self._pick_target)
+
+            layout.addSpacing(4)
+
+            swap_btn = QtWidgets.QPushButton("Swap Color")
+            swap_btn.setDefault(True)
+            swap_btn.clicked.connect(self.accept)
+            cancel_btn = QtWidgets.QPushButton("Cancel")
+            cancel_btn.clicked.connect(self.reject)
+
+            btn_row = QtWidgets.QHBoxLayout()
+            btn_row.addWidget(cancel_btn)
+            btn_row.addWidget(swap_btn)
+            layout.addLayout(btn_row)
+
+        def _make_swatch_column(self, parent_layout, label_text, color):
+            col = QtWidgets.QVBoxLayout()
+            col.setSpacing(4)
+            lbl = QtWidgets.QLabel(label_text)
+            lbl.setAlignment(QtCore.Qt.AlignCenter)
+            btn = QtWidgets.QPushButton()
+            btn.setFixedSize(100, 60)
+            btn.setCursor(QtCore.Qt.PointingHandCursor)
+            self._apply_color(btn, color)
+            col.addWidget(lbl)
+            col.addWidget(btn)
+            parent_layout.addLayout(col)
+            return btn
+
+        @staticmethod
+        def _apply_color(btn, qcolor):
+            pix = QtGui.QPixmap(btn.width() or 100, btn.height() or 60)
+            pix.fill(qcolor)
+            btn.setIcon(QtGui.QIcon(pix))
+            btn.setIconSize(btn.size())
+
+        def _pick_source(self):
+            qc = QtWidgets.QColorDialog.getColor(
+                self._source, self, "Current Color",
+                QtWidgets.QColorDialog.DontUseNativeDialog,
+            )
+            if qc.isValid():
+                self._source = qc
+                self._apply_color(self._src_btn, qc)
+
+        def _pick_target(self):
+            qc = QtWidgets.QColorDialog.getColor(
+                self._target, self, "New Color",
+                QtWidgets.QColorDialog.DontUseNativeDialog,
+            )
+            if qc.isValid():
+                self._target = qc
+                self._apply_color(self._tgt_btn, qc)
+
+        def source_color(self):
+            return colormanagement.Color(self._source.redF(), self._source.greenF(), self._source.blueF())
+
+        def target_color(self):
+            return colormanagement.Color(self._target.redF(), self._target.greenF(), self._target.blueF())
+
+    dlg = _IDColorSwapDialog(ui.get_main_window())
+    if dlg.exec() == QtWidgets.QDialog.Accepted:
+        vg_export.swap_id_map_color(dlg.source_color(), dlg.target_color())
+
+
 def flatten_stack():
     """Flatten the stack by exporting and importing textures."""
     vg_export.flatten_stack()
@@ -236,6 +325,7 @@ _ACTION_FUNCS = {
     "create_layer_from_stack":  lambda: create_layer_from_stack(),
     "create_layer_from_group":  lambda: create_layer_from_group(),
     "create_id_map_from_group": lambda: create_id_map_from_group(),
+    "id_color_swap":            lambda: id_color_swap(),
     "flatten_stack":            lambda: flatten_stack(),
     "create_ref_point_layer":   lambda: create_ref_point_layer(),
     "launch_quick_bake":        lambda: launch_quick_bake(),
@@ -259,6 +349,7 @@ _MENU_STRUCTURE = [
     "flatten_stack",
     None,
     "create_id_map_from_group",
+    "id_color_swap",
     None,
     "create_ref_point_layer",
     None,
