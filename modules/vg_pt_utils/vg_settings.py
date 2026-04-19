@@ -61,7 +61,8 @@ DEFAULT_SETTINGS = {
     "ref_point": {
         "default_name_prefix": "REF POINT LAYER"
     },
-    "pending_delete_collections": []
+    "pending_delete_collections": [],
+    "collection_panel_open": False
 }
 
 

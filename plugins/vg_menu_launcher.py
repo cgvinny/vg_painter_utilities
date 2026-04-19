@@ -138,6 +138,13 @@ def create_ref_point_layer():
 
 ### COLLECTIONS ###
 
+def _save_collection_panel_state(visible: bool):
+    """Persist the Collections panel open/closed state to settings."""
+    settings = vg_settings.load_settings()
+    settings["collection_panel_open"] = visible
+    vg_settings.save_settings(settings)
+
+
 def open_collections_panel():
     """Open (or raise) the unified Collections dockable panel."""
     global _collection_panel, _collection_dock
@@ -157,6 +164,9 @@ def open_collections_panel():
     _collection_panel = CollectionPanel()
     _collection_dock = ui.add_dock_widget(_collection_panel)
     plugin_menus_widgets.append(_collection_dock)
+
+    _collection_dock.visibilityChanged.connect(_save_collection_panel_state)
+    _save_collection_panel_state(True)
 
 
 ### QUICK BAKE ###
@@ -246,8 +256,9 @@ _MENU_STRUCTURE = [
     None,
     "create_layer_from_stack",
     "create_layer_from_group",
-    "create_id_map_from_group",
     "flatten_stack",
+    None,
+    "create_id_map_from_group",
     None,
     "create_ref_point_layer",
     None,
@@ -308,6 +319,8 @@ def start_plugin():
     """Called when the plugin is started."""
     create_menu()
     vg_collection.flush_pending_deletions()
+    if vg_settings.load_settings().get("collection_panel_open", False):
+        QTimer.singleShot(500, open_collections_panel)
     logging.info("VG Menu Activated")
     QTimer.singleShot(8000, _run_startup_update_check)
     
@@ -316,7 +329,14 @@ def close_plugin():
     """Called when the plugin is stopped."""
     global _mask_popup_menu, _collection_panel, _collection_dock
     _mask_popup_menu = None
+    if _collection_panel is not None:
+        _collection_panel.cleanup()
     _collection_panel = None
+    if _collection_dock is not None:
+        try:
+            _collection_dock.visibilityChanged.disconnect(_save_collection_panel_state)
+        except RuntimeError:
+            pass
     _collection_dock = None
     for widget in plugin_menus_widgets:
         ui.delete_ui_element(widget)
@@ -330,6 +350,8 @@ def reload_plugin():
 
     # Close the panel so stale module references are dropped
     if _collection_dock is not None:
+        if _collection_panel is not None:
+            _collection_panel.cleanup()
         try:
             ui.delete_ui_element(_collection_dock)
             if _collection_dock in plugin_menus_widgets:

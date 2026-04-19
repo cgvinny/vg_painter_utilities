@@ -19,14 +19,17 @@ CollectionPanel           — dockable panel: flat list of rows + New Collection
 
 __author__ = "Vincent GAULT - Adobe"
 
+import pathlib
+
 from PySide6 import QtWidgets, QtGui, QtCore
 from PySide6.QtCore import Qt
 
-from substance_painter import ui, project, resource, layerstack, textureset, logging
+from substance_painter import ui, project, resource, layerstack, textureset, logging, event
 from vg_pt_utils import vg_collection
 from vg_pt_utils.vg_collection import (
     Collection, CollectionSlot, CollectionLayerBuilder,
     get_collection_folder, find_spsm, find_collection_group, save_as_smart_material,
+    BatchCollectionApplicator,
 )
 
 
@@ -772,6 +775,287 @@ class CollectionSetupFloater(QtWidgets.QWidget):
 
 
 # ---------------------------------------------------------------------------
+# BatchApplyDialog — two-phase dialog for batch collection application
+# ---------------------------------------------------------------------------
+
+class BatchApplyDialog(QtWidgets.QDialog):
+    """
+    Two-phase dialog for applying a Collection to a folder of .spp projects.
+
+    Phase 1 — Setup : folder picker, SPP count, Launch button.
+    Phase 2 — Running: progress bar, per-project log, Cancel/Close button.
+    """
+
+    def __init__(self, collection: Collection, parent=None):
+        super().__init__(parent or ui.get_main_window())
+        self._collection = collection
+        self._spp_files: list = []
+        self._folder_path: pathlib.Path = None
+        self._applicator: BatchCollectionApplicator = None
+
+        self.setWindowTitle(f"Batch Apply — {collection.name}")
+        self.setMinimumWidth(500)
+        self.setAttribute(Qt.WA_DeleteOnClose, True)
+        self._build_ui()
+
+    # ------------------------------------------------------------------
+    # UI construction
+    # ------------------------------------------------------------------
+
+    def _build_ui(self):
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
+        self._pages = QtWidgets.QStackedWidget()
+        root.addWidget(self._pages)
+        self._pages.addWidget(self._make_setup_page())
+        self._pages.addWidget(self._make_running_page())
+
+    def _make_setup_page(self) -> QtWidgets.QWidget:
+        page = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(page)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(12)
+
+        info = QtWidgets.QLabel(
+            f"<b>Batch Apply</b> opens every <code>.spp</code> project in a folder "
+            f"and generates the <b>{self._collection.name}</b> collection structure "
+            f"in all its Texture Sets.<br><br>"
+            f"Each project is saved automatically after the collection is applied. "
+            f"<b>This modifies project files — back up your work first.</b>"
+        )
+        info.setWordWrap(True)
+        info.setTextFormat(Qt.RichText)
+        info.setStyleSheet(
+            "background: rgba(255,180,0,18); border: 1px solid rgba(255,180,0,55);"
+            "border-radius: 4px; padding: 10px;"
+        )
+        lay.addWidget(info)
+
+        folder_grp = QtWidgets.QGroupBox("Projects Folder")
+        fg = QtWidgets.QHBoxLayout(folder_grp)
+        self._folder_edit = QtWidgets.QLineEdit()
+        self._folder_edit.setReadOnly(True)
+        self._folder_edit.setPlaceholderText("Select a folder containing .spp files…")
+        fg.addWidget(self._folder_edit, 1)
+        browse_btn = QtWidgets.QPushButton("Browse…")
+        browse_btn.setFixedWidth(80)
+        browse_btn.clicked.connect(self._browse_folder)
+        fg.addWidget(browse_btn)
+        lay.addWidget(folder_grp)
+
+        self._count_lbl = QtWidgets.QLabel("No folder selected.")
+        self._count_lbl.setAlignment(Qt.AlignCenter)
+        self._count_lbl.setStyleSheet("color: gray; padding: 4px;")
+        lay.addWidget(self._count_lbl)
+
+        self._replace_chk = QtWidgets.QCheckBox(
+            "Replace collection if already present in the layer stack"
+        )
+        self._replace_chk.setChecked(False)
+        self._replace_chk.setToolTip(
+            "If one or more groups with the collection name already exist in a Texture Set,\n"
+            "all of them will be deleted before inserting the new one."
+        )
+        lay.addWidget(self._replace_chk)
+
+        lay.addStretch()
+
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.addStretch()
+        cancel_btn = QtWidgets.QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        btn_row.addWidget(cancel_btn)
+        self._launch_btn = QtWidgets.QPushButton("Launch Batch")
+        self._launch_btn.setDefault(True)
+        self._launch_btn.setEnabled(False)
+        self._launch_btn.clicked.connect(self._on_launch)
+        btn_row.addWidget(self._launch_btn)
+        lay.addLayout(btn_row)
+
+        return page
+
+    def _make_running_page(self) -> QtWidgets.QWidget:
+        page = QtWidgets.QWidget()
+        lay = QtWidgets.QVBoxLayout(page)
+        lay.setContentsMargins(16, 16, 16, 16)
+        lay.setSpacing(10)
+
+        self._progress_lbl = QtWidgets.QLabel("Starting…")
+        self._progress_lbl.setWordWrap(True)
+        self._progress_lbl.setTextFormat(Qt.RichText)
+        lay.addWidget(self._progress_lbl)
+
+        self._progress_bar = QtWidgets.QProgressBar()
+        self._progress_bar.setMinimum(0)
+        lay.addWidget(self._progress_bar)
+
+        self._log = QtWidgets.QListWidget()
+        self._log.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
+        self._log.setMinimumHeight(130)
+        lay.addWidget(self._log, 1)
+
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.addStretch()
+        self._action_btn = QtWidgets.QPushButton("Cancel")
+        self._action_btn.clicked.connect(self._on_cancel_batch)
+        btn_row.addWidget(self._action_btn)
+        lay.addLayout(btn_row)
+
+        return page
+
+    # ------------------------------------------------------------------
+    # Setup phase
+    # ------------------------------------------------------------------
+
+    def _browse_folder(self):
+        folder = QtWidgets.QFileDialog.getExistingDirectory(
+            self, "Select Projects Folder", "",
+            QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks,
+        )
+        if not folder:
+            return
+        self._folder_path = pathlib.Path(folder)
+        self._folder_edit.setText(str(self._folder_path))
+        self._scan_folder()
+
+    def _scan_folder(self):
+        self._spp_files = sorted(
+            p for p in self._folder_path.glob("*.spp")
+            if "autosave" not in p.name.lower()
+        )
+        n = len(self._spp_files)
+        if n == 0:
+            self._count_lbl.setStyleSheet("color: #cc4444; padding: 4px;")
+            self._count_lbl.setText("No .spp files found in this folder.")
+            self._launch_btn.setEnabled(False)
+        else:
+            s = "s" if n != 1 else ""
+            self._count_lbl.setStyleSheet("color: #55aa55; font-weight: bold; padding: 4px;")
+            self._count_lbl.setText(f"{n} .spp file{s} found.")
+            self._launch_btn.setEnabled(True)
+
+    def _on_launch(self):
+        n = len(self._spp_files)
+        if n == 0:
+            return
+
+        if find_spsm(self._collection.name) is None:
+            QtWidgets.QMessageBox.warning(
+                self, "No Smart Material",
+                f"No Smart Material (.spsm) has been saved for \"{self._collection.name}\".\n\n"
+                "Use Manage → Save as Smart Material before running a batch."
+            )
+            return
+
+        if project.is_open() and project.needs_saving():
+            reply = QtWidgets.QMessageBox.warning(
+                self, "Unsaved Changes",
+                "The current project has unsaved changes.\n\nSave before starting the batch?",
+                QtWidgets.QMessageBox.Save | QtWidgets.QMessageBox.Discard | QtWidgets.QMessageBox.Cancel,
+            )
+            if reply == QtWidgets.QMessageBox.Cancel:
+                return
+            if reply == QtWidgets.QMessageBox.Save:
+                try:
+                    project.save()
+                except Exception as e:
+                    QtWidgets.QMessageBox.critical(self, "Save Error", str(e))
+                    return
+
+        s = "s" if n != 1 else ""
+        reply = QtWidgets.QMessageBox.question(
+            self, "Confirm Batch",
+            f"Apply the \"{self._collection.name}\" collection to {n} project{s}?\n\n"
+            f"{self._folder_path}",
+            QtWidgets.QMessageBox.Ok | QtWidgets.QMessageBox.Cancel,
+        )
+        if reply != QtWidgets.QMessageBox.Ok:
+            return
+
+        if project.is_open():
+            project.close()
+
+        self._start_batch()
+
+    # ------------------------------------------------------------------
+    # Running phase
+    # ------------------------------------------------------------------
+
+    def _start_batch(self):
+        n = len(self._spp_files)
+        self._progress_bar.setMaximum(n)
+        self._progress_bar.setValue(0)
+        self._log.clear()
+        self._progress_lbl.setText(f"Preparing — {n} project(s) to process…")
+        self._pages.setCurrentIndex(1)
+        self.setMinimumHeight(420)
+        self.adjustSize()
+
+        self._applicator = BatchCollectionApplicator()
+        self._applicator.start(
+            self._collection,
+            self._spp_files,
+            replace=self._replace_chk.isChecked(),
+            on_progress=self._cb_progress,
+            on_project_done=self._cb_project_done,
+            on_finished=self._cb_finished,
+        )
+
+    def _cb_progress(self, current: int, total: int, name: str):
+        self._progress_lbl.setText(
+            f"Opening {current + 1} / {total}: <b>{name}</b>"
+        )
+        self._progress_bar.setValue(current)
+        QtWidgets.QApplication.processEvents()
+
+    def _cb_project_done(self, path, ok: bool, error: str):
+        name = path.name if hasattr(path, "name") else pathlib.Path(path).name
+        if ok:
+            item = QtWidgets.QListWidgetItem(f"✓  {name}")
+            item.setForeground(QtGui.QColor("#55aa55"))
+        else:
+            item = QtWidgets.QListWidgetItem(f"✗  {name}  —  {error}")
+            item.setForeground(QtGui.QColor("#cc4444"))
+        self._log.addItem(item)
+        self._log.scrollToBottom()
+        QtWidgets.QApplication.processEvents()
+
+    def _cb_finished(self, processed: int, errors: list):
+        self._progress_bar.setValue(self._progress_bar.maximum())
+        n_err = len(errors)
+        if n_err == 0:
+            self._progress_lbl.setText(
+                f'<font color="#55aa55">&#10003; Done — {processed} project(s) '
+                f'processed successfully.</font>'
+            )
+        else:
+            self._progress_lbl.setText(
+                f'Batch complete — {processed} processed, '
+                f'<font color="#cc4444">{n_err} error(s).</font>'
+            )
+        self._action_btn.setText("Close")
+        try:
+            self._action_btn.clicked.disconnect()
+        except RuntimeError:
+            pass
+        self._action_btn.clicked.connect(self.accept)
+        QtWidgets.QApplication.processEvents()
+
+    def _on_cancel_batch(self):
+        if self._applicator:
+            self._applicator.cancel()
+        self._action_btn.setEnabled(False)
+        self._progress_lbl.setText("Cancelling after current project…")
+
+    def closeEvent(self, event):
+        if self._applicator and self._applicator.is_running:
+            event.ignore()
+        else:
+            event.accept()
+
+
+# ---------------------------------------------------------------------------
 # CollectionRowWidget — one row in the flat collections list
 # ---------------------------------------------------------------------------
 
@@ -792,6 +1076,7 @@ class CollectionRowWidget(QtWidgets.QFrame):
     load_requested      = QtCore.Signal(object)
     manage_requested    = QtCore.Signal(object)
     duplicate_requested = QtCore.Signal(object)
+    batch_requested     = QtCore.Signal(object)
     delete_requested    = QtCore.Signal(object)
 
     _MAX_DOTS = 6
@@ -877,6 +1162,10 @@ class CollectionRowWidget(QtWidgets.QFrame):
         dup_btn.clicked.connect(lambda: self.duplicate_requested.emit(self._collection))
         outer.addWidget(dup_btn)
 
+        batch_btn = self._icon_btn("⚡", "Batch Apply (Apply this collection to multiple projects)")
+        batch_btn.clicked.connect(lambda: self.batch_requested.emit(self._collection))
+        outer.addWidget(batch_btn)
+
         del_btn = self._icon_btn("✕", "Delete this collection")
         del_btn.setStyleSheet("font-size: 13px; padding: 0px; color: #cc4444;")
         del_btn.clicked.connect(lambda: self.delete_requested.emit(self._collection))
@@ -915,6 +1204,23 @@ class CollectionPanel(QtWidgets.QWidget):
         self._setup_floater = None
         self._build_ui()
         self.refresh()
+        event.DISPATCHER.connect_strong(event.ProjectEditionEntered, self._on_project_state_changed)
+        event.DISPATCHER.connect_strong(event.ProjectClosed, self._on_project_state_changed)
+
+    def _on_project_state_changed(self, _):
+        self.refresh()
+
+    def cleanup(self):
+        """Disconnect SP event handlers. Must be called before the panel is released."""
+        try:
+            event.DISPATCHER.disconnect(event.ProjectEditionEntered, self._on_project_state_changed)
+            event.DISPATCHER.disconnect(event.ProjectClosed, self._on_project_state_changed)
+        except Exception:
+            pass
+
+    def closeEvent(self, ev):
+        self.cleanup()
+        super().closeEvent(ev)
 
     def _build_ui(self):
         root = QtWidgets.QVBoxLayout(self)
@@ -975,6 +1281,7 @@ class CollectionPanel(QtWidgets.QWidget):
                 row.load_requested.connect(self._on_load)
                 row.manage_requested.connect(self._on_manage)
                 row.duplicate_requested.connect(self._on_duplicate)
+                row.batch_requested.connect(self._on_batch)
                 row.delete_requested.connect(self._on_delete)
                 self._rows_layout.insertWidget(self._rows_layout.count() - 1, row)
         else:
@@ -1108,6 +1415,10 @@ class CollectionPanel(QtWidgets.QWidget):
                 "The Smart Material is highlighted in your Assets shelf — drag it manually."
             )
             logging.warning(f"VG Collections: insert_smart_material failed: {e}")
+
+    def _on_batch(self, collection: Collection):
+        dlg = BatchApplyDialog(collection, parent=self)
+        dlg.exec()
 
     def _on_delete(self, collection: Collection):
         reply = QtWidgets.QMessageBox.question(

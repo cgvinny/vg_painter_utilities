@@ -29,7 +29,7 @@ import time
 from dataclasses import dataclass, field
 from typing import List, Optional
 
-from substance_painter import layerstack, textureset, project, colormanagement, logging
+from substance_painter import layerstack, textureset, project, colormanagement, logging, event, resource
 
 from vg_pt_utils import vg_settings
 
@@ -405,9 +405,9 @@ class CollectionLayerBuilder:
     ID map via the Color Selection parameters panel.
     """
 
-    def build(self, collection: Collection) -> tuple:
+    def build(self, collection: Collection, stack=None) -> tuple:
         """
-        Insert the full collection structure into the active stack.
+        Insert the full collection structure into *stack* (or the active stack).
 
         Returns (parent_group_node, id_map_found: bool).
         Raises RuntimeError if no project is open.
@@ -418,7 +418,8 @@ class CollectionLayerBuilder:
         if not collection.slots:
             raise ValueError("The collection has no slots.")
 
-        stack = textureset.get_active_stack()
+        if stack is None:
+            stack = textureset.get_active_stack()
 
         # Auto-detect the baked ID map for this texture set
         id_map_resource = stack.material().get_mesh_map_resource(
@@ -462,3 +463,158 @@ class CollectionLayerBuilder:
 
         layerstack.set_selected_nodes([parent_group])
         return parent_group, id_map_resource is not None
+
+
+# ---------------------------------------------------------------------------
+# Batch applicator
+# ---------------------------------------------------------------------------
+
+class BatchCollectionApplicator:
+    """
+    Applies a Collection's layer structure to all Texture Sets in a series of
+    .spp projects, one project at a time.
+
+    Opens each project, waits for ProjectEditionEntered, builds the collection
+    group in every Texture Set, saves, then closes before the next project.
+
+    Callbacks
+    ---------
+    on_progress(current, total, name)  — before opening each project
+    on_project_done(path, ok, error)   — after each project (ok=True on success)
+    on_finished(processed, errors)     — when all done or cancelled
+    """
+
+    def __init__(self):
+        self._collection: Optional[Collection] = None
+        self._replace: bool = False
+        self._queue: list = []
+        self._total: int = 0
+        self._processed: int = 0
+        self._current_path = None
+        self._cancelled: bool = False
+        self._running: bool = False
+        self._errors: list = []
+        self._on_progress = None
+        self._on_project_done = None
+        self._on_finished = None
+
+    @property
+    def is_running(self) -> bool:
+        return self._running
+
+    def start(
+        self,
+        collection: Collection,
+        spp_paths: list,
+        replace: bool = False,
+        on_progress=None,
+        on_project_done=None,
+        on_finished=None,
+    ):
+        self._collection = collection
+        self._replace = replace
+        self._queue = list(spp_paths)
+        self._total = len(spp_paths)
+        self._processed = 0
+        self._cancelled = False
+        self._running = True
+        self._errors = []
+        self._on_progress = on_progress
+        self._on_project_done = on_project_done
+        self._on_finished = on_finished
+
+        event.DISPATCHER.connect_strong(
+            event.ProjectEditionEntered, self._on_project_ready
+        )
+        self._open_next()
+
+    def cancel(self):
+        self._cancelled = True
+
+    def _open_next(self):
+        if self._cancelled or not self._queue:
+            self._finish()
+            return
+
+        path = self._queue.pop(0)
+        self._current_path = path
+
+        if self._on_progress:
+            self._on_progress(self._processed, self._total, path.name)
+
+        try:
+            project.open(str(path))
+        except Exception as e:
+            err = str(e)
+            self._errors.append((path, err))
+            logging.error(f"VG Batch: cannot open '{path.name}': {err}")
+            if self._on_project_done:
+                self._on_project_done(path, False, err)
+            self._processed += 1
+            self._open_next()
+
+    def _on_project_ready(self, event_data):
+        from PySide6.QtCore import QTimer
+        err = None
+        try:
+            spsm_path = find_spsm(self._collection.name)
+            if spsm_path is None:
+                raise RuntimeError(
+                    f"No Smart Material (.spsm) found for '{self._collection.name}'. "
+                    "Save it via Manage → Save as Smart Material first."
+                )
+
+            # Import the .spsm once per project (resources reset on each open)
+            mtime_tag = int(spsm_path.stat().st_mtime)
+            imported = resource.import_project_resource(
+                str(spsm_path),
+                resource.Usage.SMART_MATERIAL,
+                name=f"{self._collection.name}_{mtime_tag}",
+                group="VG Collections",
+            )
+
+            # Insert into every texture set
+            for ts in textureset.all_texture_sets():
+                stack = ts.get_stack()
+
+                if self._replace:
+                    # Delete ALL root groups whose name matches the collection
+                    to_delete = [
+                        node for node in layerstack.get_root_layer_nodes(stack)
+                        if (node.get_type() == layerstack.NodeType.GroupLayer
+                                and node.get_name() == self._collection.name)
+                    ]
+                    for node in to_delete:
+                        layerstack.delete_node(node)
+
+                position = layerstack.InsertPosition.from_textureset_stack(stack)
+                group = layerstack.insert_smart_material(position, imported.identifier())
+                group.set_name(self._collection.name)
+
+            project.save()
+        except Exception as e:
+            err = str(e)
+            self._errors.append((self._current_path, err))
+            logging.error(f"VG Batch: error on '{self._current_path.name}': {err}")
+
+        self._processed += 1
+        if self._on_project_done:
+            self._on_project_done(self._current_path, err is None, err or "")
+
+        try:
+            project.close()
+        except Exception as close_err:
+            logging.error(f"VG Batch: could not close project: {close_err}")
+        # Defer next open to avoid re-entrancy inside the ProjectEditionEntered handler
+        QTimer.singleShot(50, self._open_next)
+
+    def _finish(self):
+        try:
+            event.DISPATCHER.disconnect(
+                event.ProjectEditionEntered, self._on_project_ready
+            )
+        except Exception:
+            pass
+        self._running = False
+        if self._on_finished:
+            self._on_finished(self._processed, self._errors)

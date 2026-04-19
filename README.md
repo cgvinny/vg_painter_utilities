@@ -1,60 +1,154 @@
-# VG Painter Utilities (vg_pt_utils)
+# VG Painter Utilities
 
-**VG Painter Utilities (vg_pt_utils)** is a suite of tools and shortcuts designed to add functionalities to Substance 3D Painter.
+**VG Painter Utilities** is a suite of productivity tools for **Adobe Substance 3D Painter**, adding layer shortcuts, baking helpers, a full Collection system, and more — all accessible from a dedicated **VG Utilities** menu.
 
-Feel free to use, reuse and adapt this content to your needs
-(Please read the [LICENSE](LICENSE) file for more information)
+> Compatible with Substance 3D Painter 9.x and later (PySide6).
 
-Contact me for any issue of feedback: cgvinny@adobe.com
+---
+
+## ☕ Support My Work
+
+If you find this project useful and want to show your appreciation, a small donation is always welcome — it helps me keep building and improving!
+
+[![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.me/cgvinny)
+
+Thank you! 🙏
+
+---
 
 ## Installation
-Installation and details in this [https://youtu.be/KjRgUkQnXDk ](video) here
 
-1. Copy:the 'plugins' & 'modules' folders into the 'python' folder located here by default (please adapt: if your location is different) 
+1. Download the latest release from the [Releases page](https://github.com/cgvinny/vg_painter_utilities/releases).
+2. Copy the `plugins/` and `modules/` folders into your Painter Python directory:
 
-   `C:\Users\[USER]\Documents\Adobe\Adobe Substance 3D Painter\python`
+   ```
+   C:\Users\[USER]\Documents\Adobe\Adobe Substance 3D Painter\python\
+   ```
 
-3. You will have a warning that this folder already exists: you can proceed safely, as it will just add content, or replace the previous version of the script.
+   If prompted that the folder already exists, confirm — it will only add or update files.
 
+3. In Substance 3D Painter, go to **Python → Reload All Plugins**.
+4. A **VG Utilities** menu will appear in the top menu bar.
 
-    
-
-## Usage
-
-***VG Menu Launcher***
-
-Once activated, a new "VG Utilities" will be added to the top bar, giving access to the different tools, and shortcuts will be activated. 
-
-### Activation 
-In Substance 3D Painter; go to the "Python" top menu and reload the plugins folder: "vg_menu_launcher" should be present
-
-
-### Features
-New Paint layer ( `Ctrl + P` )
+> **Video walkthrough:** [https://youtu.be/KjRgUkQnXDk](https://youtu.be/KjRgUkQnXDk)
 
 ---
-New Fill layer with Base Color activated ( `Ctrl + F` )
 
-New Fill layer with Height activated ( `Ctrl + Alt + F` )
+## Features
 
-New Fill layer, all channels activated ( `Ctrl + Shift + F` )
+### Layer Operations
 
-New Fill layer, no  channels activated ( `Alt + F` )
-
----
-Add mask to selected layer. If a mask is already present, it will switch it from black to white, or from white to black ( `Ctrl + M` )
-
-Add mask with a fill effect to selected layer. If a mask is already present, it will switch it from black to white, or from white to black ( `Shift + M` )
-
-Add black mask with AO Generator ( `Ctrl + Shift + M` )
-
-Add black mask Curvature Generator ( `Ctrl + alt + M` )
+| Action | Default Shortcut |
+|---|---|
+| New Paint Layer | `Ctrl + P` |
+| New Fill Layer — Base Color only | `Ctrl + F` |
+| New Fill Layer — Height only | `Ctrl + Alt + F` |
+| New Fill Layer — all channels | `Ctrl + Shift + F` |
+| New Fill Layer — no channels | `Alt + F` |
 
 ---
-Create new layer from what is visible in the stack (so you can delete these layers if you don't need to edit them anymore, thus improving performances.).Note that normal channel is deactivated, to avoid generatin normal information twice with the height map ( `Ctrl + shift + G` )
 
+### Mask Operations
 
-Create Reference point layer ( `Ctrl + R` )
+| Action | Default Shortcut |
+|---|---|
+| Add mask (black/white toggle) | `Ctrl + M` |
+| Add mask with Fill Effect | `Shift + M` |
+| Add black mask with AO Generator | `Ctrl + Shift + M` |
+| Add black mask with Curvature Generator | `Ctrl + Alt + M` |
+
+A popup menu is also available with additional mask types:
+- Mask with Paint Layer
+- Mask with Levels
+- Mask with Compare Mask
+- Mask with Color Selection
 
 ---
-Bake current Texture Set mesh maps ( `Ctrl + B` )
+
+### Stack Utilities
+
+| Action | Default Shortcut |
+|---|---|
+| Create layer from visible stack content | `Ctrl + Shift + G` |
+| Create layer from selected group | — |
+| Create ID map from selected group | — |
+| Flatten stack | — |
+| Create Reference Point Layer | `Ctrl + R` |
+
+**Create layer from stack** exports the visible content of the stack as a texture and re-imports it as a single fill layer — useful for collapsing complex layer structures to improve performance. The normal channel is intentionally excluded to avoid double-processing with the height map.
+
+**Create Reference Point Layer** inserts a named marker layer used as a visual anchor in the stack. The default prefix is configurable in Settings.
+
+---
+
+### Baking
+
+| Action | Default Shortcut |
+|---|---|
+| Quick Bake — current Texture Set | `Ctrl + B` |
+| Bake All — all Texture Sets | — |
+
+Both operations bake mesh maps (Normal, World Space Normal, AO, Curvature, Position, Thickness, ID) at the native resolution of each Texture Set.
+
+---
+
+### Collections
+
+The Collection system lets you define sets of **material slots**, each linked to a color in an ID map. Collections are saved as Smart Materials (`.spsm`) and can be applied to any project.
+
+#### Workflow
+
+1. **Open the panel** — *VG Utilities → Collections…*
+2. **Create a collection** — Click **+ New Collection**, enter a name and define your material slots (name + ID map color for each).
+3. **Generate the structure** — The layer group structure is automatically inserted into the active Texture Set. Fill in each group with your materials.
+4. **Save as Smart Material** — Click **Save as Smart Material** in the floating overlay. This saves the collection as a reusable `.spsm` file.
+5. **Load into a project** — Click the **▶** button on any collection row to insert it into the active Texture Set's layer stack.
+
+#### Panel Buttons (per collection)
+
+| Button | Action |
+|---|---|
+| ▶ | Insert Smart Material into the active Texture Set |
+| ⚙ | Edit collection settings, regenerate structure, update Smart Material |
+| ⧉ | Duplicate collection |
+| ⚡ | **Batch Apply** — apply to multiple projects (see below) |
+| ✕ | Delete collection |
+
+#### Batch Apply ⚡
+
+Applies a collection's Smart Material to **every Texture Set in every `.spp` project** found in a selected folder — fully automated.
+
+1. Click **⚡** on the collection row.
+2. Select a folder containing `.spp` files (auto-saves are automatically excluded).
+3. The number of detected projects is shown. Click **Launch Batch** and confirm.
+4. Painter opens each project, inserts the collection into all Texture Sets, saves, and moves to the next.
+5. A live log shows the result (✓ / ✗) for each project.
+
+**Option — Replace collection if already present:** when checked, any existing groups with the same collection name are removed before inserting — even if there are duplicates from previous runs.
+
+> The collection must have a saved Smart Material (`.spsm`) before running a batch.
+
+---
+
+### Settings
+
+*VG Utilities → Settings…* opens the settings dialog, where you can:
+- Reassign keyboard shortcuts for all actions
+- Set the default prefix for Reference Point layers
+
+---
+
+### About & Updates
+
+*VG Utilities → About VG Utilities…* shows the installed version, author, and license.
+
+A **Check for Updates** button queries the GitHub releases API. A silent background check also runs 8 seconds after Painter starts — if a newer version is available, a message is logged to the Painter console.
+
+---
+
+## Contact
+
+Issues, feedback, or contributions: [cgvinny@adobe.com](mailto:cgvinny@adobe.com)  
+GitHub: [https://github.com/cgvinny/vg_painter_utilities](https://github.com/cgvinny/vg_painter_utilities)
+
+Please read the [LICENSE](LICENSE) file for usage terms.

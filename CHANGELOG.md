@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.8.0] - 2026-04-19
+
+### Collections — Batch Apply ⚡
+
+- New **Batch Apply** feature: applies a collection's Smart Material to every Texture Set in every `.spp` project found in a selected folder, fully automated.
+- Each project is opened, the Smart Material is inserted into all Texture Sets, the project is saved, then closed before moving to the next.
+- Auto-saves (files whose name contains "autosave") are automatically excluded from the batch.
+- A two-phase dialog guides the user: folder selection with live `.spp` count, then a live progress log (✓/✗ per project) with a Cancel button.
+- New option **"Replace collection if already present"** (unchecked by default): before inserting, removes *all* root groups whose name matches the collection — handles the case where the batch was run multiple times without the option enabled.
+- The `⚡` button is added to every collection row with tooltip *"Batch Apply (Apply this collection to multiple projects)"*.
+- A `.spsm` existence check is performed before the batch starts, with a clear error message if the Smart Material has not been saved yet.
+- The confirmation dialog is concise: collection name, project count, and folder path — no alarmist wording.
+
+### Collections — panel auto-refresh
+
+- The Collections panel now listens to `ProjectEditionEntered` and `ProjectClosed` events and refreshes automatically, so the **▶ Load** button reflects the correct enabled state as soon as a project is opened or closed (previously the button stayed disabled until the panel was reopened).
+- Event handlers are properly disconnected on `close_plugin()` and `reload_plugin()` to prevent stale callbacks after a plugin reload.
+
+### Bug fixes
+
+- `BatchCollectionApplicator`: `self._replace` is now initialized in `__init__` (previously only set in `start()`).
+- `BatchCollectionApplicator`: `project.close()` is now wrapped in a `try/except` to prevent an unhandled exception if the project was already closed following a processing error.
+
+### README
+
+- Full rewrite: installation, all features with shortcut table, Collections workflow, Batch Apply instructions, Settings and About sections.
+- Added PayPal donation link.
+
+## [1.7.0] - 2026-04-18
+
 ## [1.6.2] - 2026-04-17
 
 ### Collections — Improved creation workflow
