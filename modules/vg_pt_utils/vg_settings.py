@@ -35,6 +35,7 @@ ACTION_LABELS = {
     "create_layer_from_group":  "Create Layer from Selected Group",
     "create_id_map_from_group":        "Create ID Map from Selected Group",
     "id_color_swap":                   "ID Color Swap",
+    "palette_extractor":               "Base Color Manager",
     "flatten_stack":            "Flatten Stack",
     "create_ref_point_layer":   "Create Reference Point Layer",
     "launch_quick_bake":        "Quick Bake",
@@ -54,6 +55,7 @@ DEFAULT_SETTINGS = {
         "create_layer_from_group":  {"modifier": "",            "key": ""},
         "create_id_map_from_group":        {"modifier": "Ctrl+Shift",  "key": "I"},
         "id_color_swap":                   {"modifier": "",            "key": ""},
+        "palette_extractor":               {"modifier": "",            "key": ""},
         "flatten_stack":            {"modifier": "",            "key": ""},
         "create_ref_point_layer":   {"modifier": "Ctrl",        "key": "R"},
         "launch_quick_bake":        {"modifier": "Ctrl",        "key": "B"},
@@ -64,7 +66,8 @@ DEFAULT_SETTINGS = {
         "default_name_prefix": "REF POINT LAYER"
     },
     "pending_delete_collections": [],
-    "collection_panel_open": False
+    "collection_panel_open": False,
+    "palette_panel_open": False
 }
 
 

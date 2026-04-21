@@ -18,7 +18,7 @@ from PySide6.QtGui import QKeySequence
 import importlib
 
 from substance_painter import ui, logging
-from vg_pt_utils import vg_baking, vg_export, vg_layerstack, vg_project_info, vg_settings, vg_collection, vg_about
+from vg_pt_utils import vg_baking, vg_export, vg_layerstack, vg_project_info, vg_settings, vg_collection, vg_about, vg_palette
 
 plugin_menus_widgets = []
 """Keeps track of added UI elements for cleanup."""
@@ -31,6 +31,12 @@ _collection_panel = None
 
 _collection_dock = None
 """The QDockWidget wrapping the panel, returned by ui.add_dock_widget()."""
+
+_palette_panel = None
+"""The PalettePanel widget instance — kept alive to prevent garbage collection."""
+
+_palette_dock = None
+"""The QDockWidget wrapping the palette panel, returned by ui.add_dock_widget()."""
 
 _startup_update_worker = None
 """Background thread for the silent startup update check."""
@@ -258,6 +264,37 @@ def open_collections_panel():
     _save_collection_panel_state(True)
 
 
+### PALETTE ###
+
+def _save_palette_panel_state(visible: bool):
+    """Persist the Base Color Manager panel open/closed state to settings."""
+    settings = vg_settings.load_settings()
+    settings["palette_panel_open"] = visible
+    vg_settings.save_settings(settings)
+
+
+def open_palette_panel():
+    """Open (or raise) the Base Color Manager dockable panel."""
+    global _palette_panel, _palette_dock
+
+    if _palette_dock is not None:
+        try:
+            _palette_dock.show()
+            _palette_dock.raise_()
+            _palette_panel.refresh()
+            return
+        except RuntimeError:
+            _palette_dock = None
+            _palette_panel = None
+
+    _palette_panel = vg_palette.PalettePanel()
+    _palette_dock = ui.add_dock_widget(_palette_panel)
+    plugin_menus_widgets.append(_palette_dock)
+
+    _palette_dock.visibilityChanged.connect(_save_palette_panel_state)
+    _save_palette_panel_state(True)
+
+
 ### QUICK BAKE ###
 
 def launch_quick_bake():
@@ -302,8 +339,8 @@ def open_settings():
     from vg_pt_utils.vg_settings_dialog import SettingsDialog
     dlg = SettingsDialog(ui.get_main_window())
     if dlg.exec() == QtWidgets.QDialog.Accepted:
-        # Preserve dock widgets (e.g. the Collections panel) across the menu rebuild.
-        docks = [w for w in plugin_menus_widgets if w is _collection_dock]
+        # Preserve dock widgets across the menu rebuild.
+        docks = [w for w in plugin_menus_widgets if w in (_collection_dock, _palette_dock)]
         menus = [w for w in plugin_menus_widgets if w not in docks]
         for widget in menus:
             ui.delete_ui_element(widget)
@@ -326,6 +363,7 @@ _ACTION_FUNCS = {
     "create_layer_from_group":  lambda: create_layer_from_group(),
     "create_id_map_from_group":        lambda: create_id_map_from_group(),
     "id_color_swap":                   lambda: id_color_swap(),
+    "palette_extractor":               lambda: open_palette_panel(),
     "flatten_stack":            lambda: flatten_stack(),
     "create_ref_point_layer":   lambda: create_ref_point_layer(),
     "launch_quick_bake":        lambda: launch_quick_bake(),
@@ -350,6 +388,7 @@ _MENU_STRUCTURE = [
     None,
     "create_id_map_from_group",
     "id_color_swap",
+    "palette_extractor",
     None,
     "create_ref_point_layer",
     None,
@@ -410,15 +449,34 @@ def start_plugin():
     """Called when the plugin is started."""
     create_menu()
     vg_collection.flush_pending_deletions()
-    if vg_settings.load_settings().get("collection_panel_open", False):
+    settings = vg_settings.load_settings()
+    if settings.get("collection_panel_open", False):
         QTimer.singleShot(500, open_collections_panel)
+    if settings.get("palette_panel_open", False):
+        QTimer.singleShot(500, open_palette_panel)
     logging.info("VG Menu Activated")
     QTimer.singleShot(8000, _run_startup_update_check)
     
 
 def close_plugin():
     """Called when the plugin is stopped."""
-    global _mask_popup_menu, _collection_panel, _collection_dock
+    global _mask_popup_menu, _collection_panel, _collection_dock, _palette_panel, _palette_dock
+
+    # Save panel visibility BEFORE any cleanup — shutdown signals would overwrite with False.
+    settings = vg_settings.load_settings()
+    if _collection_dock is not None:
+        try:
+            settings["collection_panel_open"] = _collection_dock.isVisible()
+        except RuntimeError:
+            pass
+    if _palette_dock is not None:
+        try:
+            settings["palette_panel_open"] = _palette_dock.isVisible()
+        except RuntimeError:
+            pass
+    vg_settings.save_settings(settings)
+
+    # Disconnect visibility signals so the delete_ui_element calls don't overwrite the saved state.
     _mask_popup_menu = None
     if _collection_panel is not None:
         _collection_panel.cleanup()
@@ -429,6 +487,19 @@ def close_plugin():
         except RuntimeError:
             pass
     _collection_dock = None
+    if _palette_panel is not None:
+        try:
+            _palette_panel._poll_timer.stop()
+            _palette_panel._disconnect_events()
+        except Exception:
+            pass
+    if _palette_dock is not None:
+        try:
+            _palette_dock.visibilityChanged.disconnect(_save_palette_panel_state)
+        except RuntimeError:
+            pass
+    _palette_panel = None
+    _palette_dock = None
     for widget in plugin_menus_widgets:
         ui.delete_ui_element(widget)
     plugin_menus_widgets.clear()
@@ -437,7 +508,23 @@ def close_plugin():
 
 def reload_plugin():
     """Reload plugin modules and recreate the menu."""
-    global _collection_panel, _collection_dock
+    global _collection_panel, _collection_dock, _palette_panel, _palette_dock
+
+    if _palette_panel is not None:
+        try:
+            _palette_panel._poll_timer.stop()
+            _palette_panel._disconnect_events()
+        except Exception:
+            pass
+    if _palette_dock is not None:
+        try:
+            ui.delete_ui_element(_palette_dock)
+            if _palette_dock in plugin_menus_widgets:
+                plugin_menus_widgets.remove(_palette_dock)
+        except Exception:
+            pass
+        _palette_dock = None
+        _palette_panel = None
 
     # Close the panel so stale module references are dropped
     if _collection_dock is not None:
@@ -457,6 +544,7 @@ def reload_plugin():
     importlib.reload(vg_export)
     importlib.reload(vg_baking)
     importlib.reload(vg_project_info)
+    importlib.reload(vg_palette)
     importlib.reload(vg_collection)
     importlib.reload(vg_about)
     from vg_pt_utils import vg_settings_dialog
