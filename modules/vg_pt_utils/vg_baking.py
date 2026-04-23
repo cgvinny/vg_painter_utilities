@@ -82,7 +82,8 @@ class BakingProcessManager:
             current_texture_set (TextureSet): The texture set to bake.
         """
         self._connect_event()
-        baking.bake_async(current_texture_set)
+        ui.switch_to_mode(ui.UIMode(4))
+        QTimer.singleShot(300, lambda: baking.bake_async(current_texture_set))
 
     def start_baking_all(self):
         """
@@ -91,7 +92,8 @@ class BakingProcessManager:
         before calling this method.
         """
         self._connect_event()
-        baking.bake_selected_textures_async()
+        ui.switch_to_mode(ui.UIMode(4))
+        QTimer.singleShot(300, baking.bake_selected_textures_async)
 
 
 ##################### FUNCTIONS #####################
