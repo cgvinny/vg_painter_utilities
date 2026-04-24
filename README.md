@@ -52,13 +52,14 @@ Thank you! 🙏
 
 | Action | Default Shortcut |
 |---|---|
-| Add mask (black/white toggle) | `Ctrl + M` |
-| Add mask with Fill Effect | `Shift + M` |
-| Add black mask with AO Generator | `Ctrl + Shift + M` |
-| Add black mask with Curvature Generator | `Ctrl + Alt + M` |
+| Add Mask… (popup) | `Ctrl + Shift + M` |
 
-A popup menu is also available with additional mask types:
+The popup lets you choose the mask type:
+- Black Mask / White Mask
+- Mask with Fill Effect
 - Mask with Paint Layer
+- Mask with AO Generator
+- Mask with Curvature Generator
 - Mask with Levels
 - Mask with Compare Mask
 - Mask with Color Selection
@@ -69,13 +70,9 @@ A popup menu is also available with additional mask types:
 
 | Action | Default Shortcut |
 |---|---|
-| Create layer from visible stack content | `Ctrl + Shift + G` |
-| Create layer from selected group | — |
-| Create ID map from selected group | — |
-| Flatten stack | — |
+| Create ID map from selected group | `Ctrl + Shift + I` |
+| ID Color Swap | — |
 | Create Reference Point Layer | `Ctrl + R` |
-
-**Create layer from stack** exports the visible content of the stack as a texture and re-imports it as a single fill layer — useful for collapsing complex layer structures to improve performance. The normal channel is intentionally excluded to avoid double-processing with the height map.
 
 **Create Reference Point Layer** inserts a named marker layer used as a visual anchor in the stack. The default prefix is configurable in Settings.
 
@@ -86,7 +83,7 @@ A popup menu is also available with additional mask types:
 | Action | Default Shortcut |
 |---|---|
 | Quick Bake — current Texture Set | `Ctrl + B` |
-| Bake All — all Texture Sets | — |
+| Bake All — all Texture Sets | `Ctrl + Shift + B` |
 
 Both operations bake mesh maps (Normal, World Space Normal, AO, Curvature, Position, Thickness, ID) at the native resolution of each Texture Set.
 
