@@ -101,10 +101,13 @@ class BakingProcessManager:
 def quick_bake():
     """
     Bake mesh maps for the active texture set using its current resolution.
+    Respects the baker selection currently configured in the Baking Room.
     """
     ts_info = vg_project_info.TextureSetInfo().get_info()
+    baking_params = baking.BakingParameters.from_texture_set(ts_info.texture_set)
+    enabled_maps = [m.value for m in baking_params.get_enabled_bakers()]
     BakingParameterConfigurator().configure_baking_parameters(
-        ts_info.texture_set, QUICK_BAKE_MESH_MAPS
+        ts_info.texture_set, enabled_maps
     )
     BakingProcessManager().start_baking(ts_info.texture_set)
 
