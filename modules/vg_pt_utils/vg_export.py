@@ -588,7 +588,15 @@ def save_viewport_thumbnail():
 
     viewport_rect = _find_viewport_rect(main_window)
     if viewport_rect:
-        pixmap = pixmap.copy(viewport_rect)
+        dpr = pixmap.devicePixelRatio()
+        physical = QtCore.QRect(
+            round(viewport_rect.x() * dpr),
+            round(viewport_rect.y() * dpr),
+            round(viewport_rect.width() * dpr),
+            round(viewport_rect.height() * dpr),
+        )
+        pixmap = pixmap.copy(physical)
+        pixmap.setDevicePixelRatio(dpr)
 
     from PySide6.QtCore import QBuffer, QIODevice, QByteArray
     byte_array = QByteArray()
