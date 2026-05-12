@@ -42,7 +42,7 @@ _palette_dock = None
 _startup_update_worker = None
 """Background thread for the silent startup update check."""
 
-_auto_thumbnail_action = None
+_auto_snapshot_action = None
 """Checkable menu action for Auto Thumbnail — kept alive to stay in sync with the setting."""
 
 ### LAYER FUNCTIONS ###
@@ -88,9 +88,9 @@ def create_id_map_from_group():
     vg_export.create_id_map_from_group()
 
 
-def save_viewport_thumbnail():
+def save_viewport_snapshot():
     """Grab the central viewport and save it as a PNG next to the .spp file."""
-    vg_export.save_viewport_thumbnail()
+    vg_export.save_viewport_snapshot()
 
 
 def id_color_swap():
@@ -226,27 +226,27 @@ def _run_startup_update_check():
 ### AUTO THUMBNAIL ###
 
 def _on_project_saved(e):
-    if vg_settings.load_settings().get("auto_thumbnail", False):
-        vg_export.save_viewport_thumbnail(silent=True)
+    if vg_settings.load_settings().get("auto_snapshot", False):
+        vg_export.save_viewport_snapshot(silent=True)
 
 
 def _on_project_opened(e):
-    if vg_settings.load_settings().get("auto_thumbnail", False):
-        QTimer.singleShot(1000, lambda: vg_export.save_viewport_thumbnail(silent=True))
+    if vg_settings.load_settings().get("auto_snapshot", False):
+        QTimer.singleShot(1000, lambda: vg_export.save_viewport_snapshot(silent=True))
 
 
 def _on_project_created(e):
-    if vg_settings.load_settings().get("auto_thumbnail", False):
-        QTimer.singleShot(1000, lambda: vg_export.save_viewport_thumbnail(silent=True))
+    if vg_settings.load_settings().get("auto_snapshot", False):
+        QTimer.singleShot(1000, lambda: vg_export.save_viewport_snapshot(silent=True))
 
 
-def _connect_auto_thumbnail_events():
+def _connect_auto_snapshot_events():
     event.DISPATCHER.connect_strong(event.ProjectSaved,   _on_project_saved)
     event.DISPATCHER.connect_strong(event.ProjectOpened,  _on_project_opened)
     event.DISPATCHER.connect_strong(event.ProjectCreated, _on_project_created)
 
 
-def _disconnect_auto_thumbnail_events():
+def _disconnect_auto_snapshot_events():
     for ev, cb in [
         (event.ProjectSaved,   _on_project_saved),
         (event.ProjectOpened,  _on_project_opened),
@@ -258,14 +258,14 @@ def _disconnect_auto_thumbnail_events():
             pass
 
 
-def toggle_auto_thumbnail():
-    """Toggle the auto thumbnail setting and update the menu action check state."""
+def toggle_auto_snapshot():
+    """Toggle the auto viewport snapshot setting and update the menu action check state."""
     settings = vg_settings.load_settings()
-    new_state = not settings.get("auto_thumbnail", False)
-    settings["auto_thumbnail"] = new_state
+    new_state = not settings.get("auto_snapshot", False)
+    settings["auto_snapshot"] = new_state
     vg_settings.save_settings(settings)
-    if _auto_thumbnail_action is not None:
-        _auto_thumbnail_action.setChecked(new_state)
+    if _auto_snapshot_action is not None:
+        _auto_snapshot_action.setChecked(new_state)
 
 
 ### SETTINGS ###
@@ -302,7 +302,6 @@ _ACTION_FUNCS = {
     "launch_quick_bake":        launch_quick_bake,
     "launch_bake_all":          launch_bake_all,
     "collection_panel":         open_collections_panel,
-    "save_viewport_thumbnail":  save_viewport_thumbnail,
 }
 
 # Menu structure: action IDs interleaved with None for separators.
@@ -326,8 +325,6 @@ _MENU_STRUCTURE = [
     "launch_bake_all",
     None,
     "collection_panel",
-    None,
-    "save_viewport_thumbnail",
 ]
 
 
@@ -356,12 +353,29 @@ def create_menu():
             vg_utilities_menu.addAction(action)
 
     vg_utilities_menu.addSeparator()
-    global _auto_thumbnail_action
-    _auto_thumbnail_action = QtGui.QAction("Auto Thumbnail on Save", vg_utilities_menu)
-    _auto_thumbnail_action.setCheckable(True)
-    _auto_thumbnail_action.setChecked(settings.get("auto_thumbnail", False))
-    _auto_thumbnail_action.triggered.connect(toggle_auto_thumbnail)
-    vg_utilities_menu.addAction(_auto_thumbnail_action)
+    vg_utilities_menu.setToolTipsVisible(True)
+
+    snapshot_action = QtGui.QAction("Save Viewport Snapshot", vg_utilities_menu)
+    snapshot_action.setToolTip(
+        "Saves a PNG capture of the 3D viewport next to the current project file (.spp), "
+        "using the same base name."
+    )
+    sc_data = settings["shortcuts"].get("save_viewport_snapshot", {})
+    sc_str = vg_settings.build_shortcut_string(sc_data.get("modifier", ""), sc_data.get("key", ""))
+    if sc_str:
+        snapshot_action.setShortcut(QKeySequence(sc_str))
+    snapshot_action.triggered.connect(save_viewport_snapshot)
+    vg_utilities_menu.addAction(snapshot_action)
+
+    global _auto_snapshot_action
+    _auto_snapshot_action = QtGui.QAction("Auto Viewport Snapshot", vg_utilities_menu)
+    _auto_snapshot_action.setCheckable(True)
+    _auto_snapshot_action.setChecked(settings.get("auto_snapshot", False))
+    _auto_snapshot_action.setToolTip(
+        "Automatically saves a viewport snapshot whenever the project is opened, created, or saved."
+    )
+    _auto_snapshot_action.triggered.connect(toggle_auto_snapshot)
+    vg_utilities_menu.addAction(_auto_snapshot_action)
 
     vg_utilities_menu.addSeparator()
     settings_action = QtGui.QAction("Settings...", vg_utilities_menu)
@@ -379,7 +393,7 @@ def start_plugin():
     """Called when the plugin is started."""
     create_menu()
     vg_collection.flush_pending_deletions()
-    _connect_auto_thumbnail_events()
+    _connect_auto_snapshot_events()
     settings = vg_settings.load_settings()
     if settings.get("collection_panel_open", False):
         QTimer.singleShot(500, open_collections_panel)
@@ -391,9 +405,9 @@ def start_plugin():
 
 def close_plugin():
     """Called when the plugin is stopped."""
-    global _mask_popup_menu, _collection_panel, _collection_dock, _palette_panel, _palette_dock, _auto_thumbnail_action
-    _disconnect_auto_thumbnail_events()
-    _auto_thumbnail_action = None
+    global _mask_popup_menu, _collection_panel, _collection_dock, _palette_panel, _palette_dock, _auto_snapshot_action
+    _disconnect_auto_snapshot_events()
+    _auto_snapshot_action = None
 
     # Save panel visibility BEFORE any cleanup — shutdown signals would overwrite with False.
     settings = vg_settings.load_settings()

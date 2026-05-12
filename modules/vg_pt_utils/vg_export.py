@@ -567,7 +567,7 @@ def _find_viewport_rect(main_window):
         return None
 
 
-def save_viewport_thumbnail(silent: bool = False):
+def save_viewport_snapshot(silent: bool = False):
     """
     Capture the 3D viewport and save it as a PNG next to the .spp file.
     The output file takes the same base name as the project (e.g. my_project.png).
@@ -584,12 +584,12 @@ def save_viewport_thumbnail(silent: bool = False):
     spp_path = project.file_path()
     if not spp_path:
         if silent:
-            logging.warning("VG Export: auto thumbnail skipped — project has no file path yet.")
+            logging.warning("VG Export: auto snapshot skipped — project has no file path yet.")
         else:
             QtWidgets.QMessageBox.warning(
                 ui.get_main_window(),
-                "Save Thumbnail",
-                "Save the project first — the thumbnail is placed next to the .spp file.",
+                "Save Viewport Snapshot",
+                "Save the project first — the snapshot is placed next to the .spp file.",
             )
         return
 
@@ -625,13 +625,13 @@ def save_viewport_thumbnail(silent: bool = False):
         save_path.write_bytes(bytes(byte_array))
     except OSError:
         if silent:
-            logging.warning(f"VG Export: auto thumbnail could not be written to '{save_path}' — access denied.")
+            logging.warning(f"VG Export: auto snapshot could not be written to '{save_path}' — access denied.")
         else:
             QtWidgets.QMessageBox.warning(
                 ui.get_main_window(),
-                "Save Thumbnail",
-                f"Could not save the thumbnail — write access denied:\n{save_path}",
+                "Save Viewport Snapshot",
+                f"Could not save the snapshot — write access denied:\n{save_path}",
             )
         return
 
-    logging.info(f"VG Export: thumbnail saved → '{save_path}'")
+    logging.info(f"VG Export: snapshot saved → '{save_path}'")
