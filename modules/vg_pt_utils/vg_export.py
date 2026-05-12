@@ -551,8 +551,17 @@ def _find_viewport_rect(main_window):
         if not candidates:
             return None
         vp = max(candidates, key=lambda w: w.width() * w.height())
-        pos = vp.mapTo(main_window, QtCore.QPoint(0, 0))
-        return QtCore.QRect(pos, vp.size())
+
+        # Prefer the QSplitter child, which holds the actual 3D render area
+        # (excludes the viewport toolbar QFrame at the top and QProgressBar at the bottom).
+        splitter = next(
+            (c for c in vp.children()
+             if isinstance(c, QtWidgets.QSplitter) and c.isVisible()),
+            None
+        )
+        target = splitter if splitter else vp
+        pos = target.mapTo(main_window, QtCore.QPoint(0, 0))
+        return QtCore.QRect(pos, target.size())
     except Exception as e:
         logging.info(f"VG Export: _find_viewport_rect exception: {e}")
         return None
