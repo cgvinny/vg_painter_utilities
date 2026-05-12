@@ -534,10 +534,29 @@ def flatten_stack():
         _apply_textures_to_new_layer(stack_manager, exported_textures)
 
 
+def _find_viewport_rect(main_window):
+    """
+    Try to locate the 3D viewport within main_window by finding the largest
+    QOpenGLWidget child. Returns a QRect relative to main_window, or None.
+    """
+    try:
+        from PySide6.QtOpenGLWidgets import QOpenGLWidget
+        gl_widgets = [w for w in main_window.findChildren(QOpenGLWidget)
+                      if w.isVisible()]
+        if not gl_widgets:
+            return None
+        vp = max(gl_widgets, key=lambda w: w.width() * w.height())
+        pos = vp.mapTo(main_window, QtCore.QPoint(0, 0))
+        return QtCore.QRect(pos, vp.size())
+    except Exception:
+        return None
+
+
 def save_viewport_thumbnail():
     """
-    Capture the Painter window and save it as a PNG next to the .spp file.
+    Capture the 3D viewport and save it as a PNG next to the .spp file.
     The output file takes the same base name as the project (e.g. my_project.png).
+    Falls back to the full window if the viewport widget cannot be located.
     Does nothing if the project has never been saved.
     """
     if not project.is_open():
@@ -561,6 +580,10 @@ def save_viewport_thumbnail():
         logging.error("VG Export: screen grab returned an empty image.")
         return
 
+    viewport_rect = _find_viewport_rect(main_window)
+    if viewport_rect:
+        pixmap = pixmap.copy(viewport_rect)
+
     from PySide6.QtCore import QBuffer, QIODevice, QByteArray
     byte_array = QByteArray()
     buf = QBuffer(byte_array)
@@ -570,8 +593,12 @@ def save_viewport_thumbnail():
 
     try:
         save_path.write_bytes(bytes(byte_array))
-    except OSError as e:
-        logging.error(f"VG Export: could not write thumbnail to '{save_path}': {e}")
+    except OSError:
+        QtWidgets.QMessageBox.warning(
+            ui.get_main_window(),
+            "Save Thumbnail",
+            f"Could not save the thumbnail — write access denied:\n{save_path}",
+        )
         return
 
     logging.info(f"VG Export: thumbnail saved → '{save_path}'")
