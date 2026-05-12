@@ -561,8 +561,17 @@ def save_viewport_thumbnail():
         logging.error("VG Export: screen grab returned an empty image.")
         return
 
-    if not pixmap.save(str(save_path), "PNG"):
-        logging.error(f"VG Export: could not write thumbnail to '{save_path}'.")
+    from PySide6.QtCore import QBuffer, QIODevice, QByteArray
+    byte_array = QByteArray()
+    buf = QBuffer(byte_array)
+    buf.open(QIODevice.OpenModeFlag.WriteOnly)
+    pixmap.save(buf, "PNG")
+    buf.close()
+
+    try:
+        save_path.write_bytes(bytes(byte_array))
+    except OSError as e:
+        logging.error(f"VG Export: could not write thumbnail to '{save_path}': {e}")
         return
 
     logging.info(f"VG Export: thumbnail saved → '{save_path}'")
