@@ -536,7 +536,7 @@ def flatten_stack():
 
 def save_viewport_thumbnail():
     """
-    Grab the central viewport widget and save it as a PNG next to the .spp file.
+    Capture the Painter window and save it as a PNG next to the .spp file.
     The output file takes the same base name as the project (e.g. my_project.png).
     Does nothing if the project has never been saved.
     """
@@ -554,14 +554,11 @@ def save_viewport_thumbnail():
 
     save_path = pathlib.Path(spp_path).with_suffix(".png")
 
-    central = ui.get_main_window().centralWidget()
-    if central is None:
-        logging.error("VG Export: could not locate the central viewport widget.")
-        return
-
-    pixmap = central.grab()
+    main_window = ui.get_main_window()
+    screen = QtWidgets.QApplication.primaryScreen()
+    pixmap = screen.grabWindow(main_window.winId())
     if pixmap.isNull():
-        logging.error("VG Export: viewport grab returned an empty image.")
+        logging.error("VG Export: screen grab returned an empty image.")
         return
 
     if not pixmap.save(str(save_path)):
