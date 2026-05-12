@@ -540,15 +540,21 @@ def _find_viewport_rect(main_window):
     QOpenGLWidget child. Returns a QRect relative to main_window, or None.
     """
     try:
-        from PySide6.QtOpenGLWidgets import QOpenGLWidget
-        gl_widgets = [w for w in main_window.findChildren(QOpenGLWidget)
-                      if w.isVisible()]
-        if not gl_widgets:
+        candidates = [
+            w for w in main_window.findChildren(QtWidgets.QWidget)
+            if w.isVisible() and w.width() > 200 and w.height() > 200
+            and not isinstance(w, (QtWidgets.QDockWidget, QtWidgets.QMenuBar,
+                                   QtWidgets.QToolBar, QtWidgets.QStatusBar,
+                                   QtWidgets.QDialog, QtWidgets.QMenu,
+                                   QtWidgets.QAbstractScrollArea))
+        ]
+        if not candidates:
             return None
-        vp = max(gl_widgets, key=lambda w: w.width() * w.height())
+        vp = max(candidates, key=lambda w: w.width() * w.height())
         pos = vp.mapTo(main_window, QtCore.QPoint(0, 0))
         return QtCore.QRect(pos, vp.size())
-    except Exception:
+    except Exception as e:
+        logging.info(f"VG Export: _find_viewport_rect exception: {e}")
         return None
 
 
