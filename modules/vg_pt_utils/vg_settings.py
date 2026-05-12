@@ -38,6 +38,7 @@ ACTION_LABELS = {
     "launch_quick_bake":        "Quick Bake",
     "launch_bake_all":          "Bake All Texture Sets",
     "collection_panel":         "Collections — Open Panel",
+    "save_viewport_thumbnail":  "Save Viewport Thumbnail",
 }
 
 DEFAULT_SETTINGS = {
@@ -55,6 +56,7 @@ DEFAULT_SETTINGS = {
         "launch_quick_bake":        {"modifier": "Ctrl",        "key": "B"},
         "launch_bake_all":          {"modifier": "Ctrl+Shift",  "key": "B"},
         "collection_panel":         {"modifier": "",            "key": ""},
+        "save_viewport_thumbnail":  {"modifier": "",            "key": ""},
     },
     "ref_point": {
         "default_name_prefix": "REF POINT LAYER"

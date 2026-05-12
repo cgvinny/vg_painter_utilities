@@ -85,6 +85,11 @@ def create_id_map_from_group():
     vg_export.create_id_map_from_group()
 
 
+def save_viewport_thumbnail():
+    """Grab the central viewport and save it as a PNG next to the .spp file."""
+    vg_export.save_viewport_thumbnail()
+
+
 def id_color_swap():
     """Open a dialog to pick source and target colors, then swap them in the ID map."""
     from vg_pt_utils.vg_export import IDColorSwapDialog
@@ -249,6 +254,7 @@ _ACTION_FUNCS = {
     "launch_quick_bake":        launch_quick_bake,
     "launch_bake_all":          launch_bake_all,
     "collection_panel":         open_collections_panel,
+    "save_viewport_thumbnail":  save_viewport_thumbnail,
 }
 
 # Menu structure: action IDs interleaved with None for separators.
@@ -272,6 +278,8 @@ _MENU_STRUCTURE = [
     "launch_bake_all",
     None,
     "collection_panel",
+    None,
+    "save_viewport_thumbnail",
 ]
 
 

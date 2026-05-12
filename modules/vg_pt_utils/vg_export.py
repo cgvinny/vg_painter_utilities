@@ -12,7 +12,8 @@ in Substance 3D Painter, used to flatten or snapshot the layer stack.
 __author__ = "Vincent GAULT - Adobe"
 
 import os
-from substance_painter import export, textureset, resource, layerstack, logging, colormanagement, ui
+import pathlib
+from substance_painter import export, textureset, resource, layerstack, logging, colormanagement, ui, project
 from PySide6 import QtWidgets, QtGui, QtCore
 from vg_pt_utils import vg_layerstack, vg_project_info
 from vg_pt_utils.vg_layerstack import BLENDING_NORMAL
@@ -531,3 +532,40 @@ def flatten_stack():
     stack_manager.delete_stack_content()
     if exported_textures:
         _apply_textures_to_new_layer(stack_manager, exported_textures)
+
+
+def save_viewport_thumbnail():
+    """
+    Grab the central viewport widget and save it as a PNG next to the .spp file.
+    The output file takes the same base name as the project (e.g. my_project.png).
+    Does nothing if the project has never been saved.
+    """
+    if not project.is_open():
+        return
+
+    spp_path = project.file_path()
+    if not spp_path:
+        QtWidgets.QMessageBox.warning(
+            ui.get_main_window(),
+            "Save Thumbnail",
+            "Save the project first — the thumbnail is placed next to the .spp file.",
+        )
+        return
+
+    save_path = pathlib.Path(spp_path).with_suffix(".png")
+
+    central = ui.get_main_window().centralWidget()
+    if central is None:
+        logging.error("VG Export: could not locate the central viewport widget.")
+        return
+
+    pixmap = central.grab()
+    if pixmap.isNull():
+        logging.error("VG Export: viewport grab returned an empty image.")
+        return
+
+    if not pixmap.save(str(save_path)):
+        logging.error(f"VG Export: could not write thumbnail to '{save_path}'.")
+        return
+
+    logging.info(f"VG Export: thumbnail saved → '{save_path}'")
