@@ -12,7 +12,7 @@ in Substance 3D Painter, used to flatten or snapshot the layer stack.
 __author__ = "Vincent GAULT - Adobe"
 
 import os
-from substance_painter import export, textureset, resource, layerstack
+from substance_painter import export, textureset, resource, layerstack, logging
 from vg_pt_utils import vg_layerstack, vg_project_info
 from vg_pt_utils.vg_layerstack import BLENDING_NORMAL
 
@@ -98,7 +98,7 @@ class TextureAssignmentManager:
             try:
                 os.remove(texture_path)
             except OSError as e:
-                print(f"Warning: could not delete texture file '{texture_path}': {e}")
+                logging.warning(f"VG Export: could not delete texture file '{texture_path}': {e}")
 
 
 class ExportConfigGenerator:
@@ -167,11 +167,11 @@ class TextureExporter:
         try:
             export_result = export.export_project_textures(export_config)
             if export_result.status == export.ExportStatus.Error:
-                print("Error during texture export:", export_result.message)
+                logging.error(f"VG Export: texture export failed: {export_result.message}")
                 return None
             return export_result
         except Exception as e:
-            print(f"Error during texture export: {e}")
+            logging.error(f"VG Export: texture export failed: {e}")
             return None
 
 
