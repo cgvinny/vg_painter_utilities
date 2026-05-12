@@ -214,33 +214,22 @@ class MaskManager:
             else:
                 selected_layer.add_mask(color_map.get(mask_bkg_color, layerstack.MaskBackground.Black))
 
-    def add_black_mask_with_ao_generator(self):
-        """Add a black mask with an Ambient Occlusion generator to the selected layer."""
+    def _add_black_mask_with_generator(self, resource_query):
         self.add_mask('Black')
-
         if not self.layer_manager.current_stack:
             return
-
-        current_layer = layerstack.get_selected_nodes(self.layer_manager.current_stack)
-        generator_resource = resource.search("s:starterassets u:generator n:Ambient Occlusion")[0]
-
-        for layer in current_layer:
+        generator_resource = resource.search(resource_query)[0]
+        for layer in layerstack.get_selected_nodes(self.layer_manager.current_stack):
             pos = layerstack.InsertPosition.inside_node(layer, layerstack.NodeStack.Mask)
             layerstack.insert_generator_effect(pos, generator_resource.identifier())
+
+    def add_black_mask_with_ao_generator(self):
+        """Add a black mask with an Ambient Occlusion generator to the selected layer."""
+        self._add_black_mask_with_generator("s:starterassets u:generator n:Ambient Occlusion")
 
     def add_black_mask_with_curvature_generator(self):
         """Add a black mask with a Curvature generator to the selected layer."""
-        self.add_mask('Black')
-
-        if not self.layer_manager.current_stack:
-            return
-
-        current_layer = layerstack.get_selected_nodes(self.layer_manager.current_stack)
-        generator_resource = resource.search("s:starterassets u:generator n:Curvature")[0]
-
-        for layer in current_layer:
-            pos = layerstack.InsertPosition.inside_node(layer, layerstack.NodeStack.Mask)
-            layerstack.insert_generator_effect(pos, generator_resource.identifier())
+        self._add_black_mask_with_generator("s:starterassets u:generator n:Curvature")
 
     def _mask_insert_position(self):
         """
