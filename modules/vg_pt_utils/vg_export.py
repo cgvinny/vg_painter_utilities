@@ -177,6 +177,30 @@ class TextureExporter:
 
 ##### FUNCTIONS USING THE CLASSES #####
 
+def _build_id_map_export_config(ts_info):
+    """Build the export config dict for a BaseColor-only (ID map) export."""
+    udim_suffix = '.$udim' if ts_info.texture_set.has_uv_tiles() else ''
+    return {
+        "exportPath": export.get_default_export_path(),
+        "exportShaderParams": False,
+        "defaultExportPreset": "ID Map Export",
+        "exportPresets": [{
+            "name": "ID Map Export",
+            "maps": [{
+                "fileName": f"$mesh_$textureSet_ID{udim_suffix}",
+                "channels": [
+                    {"destChannel": c, "srcChannel": c,
+                     "srcMapType": "DocumentMap", "srcMapName": "BaseColor"}
+                    for c in "RGBA"
+                ],
+                "parameters": {"bitDepth": "8", "dithering": False, "fileFormat": "png"},
+            }],
+        }],
+        "exportList": [{"rootPath": ts_info.name}],
+        "exportParameters": [{"parameters": {"dithering": False, "paddingAlgorithm": "infinite"}}],
+        "uvTiles": ts_info.uv_tiles_coordinates,
+    }
+
 def _apply_textures_to_new_layer(stack_manager, exported_textures):
     """Create a Normal-blend fill layer on top of the stack and populate it with exported textures."""
     new_layer = stack_manager.add_layer("fill", layer_position="On Top", layer_name="Stack layer")
@@ -280,30 +304,7 @@ def create_id_map_from_group():
             node.set_visible(node == target_group)
 
         ts_info = vg_project_info.TextureSetInfo().get_info()
-        udim_suffix = '.$udim' if ts_info.texture_set.has_uv_tiles() else ''
-
-        export_config = {
-            "exportPath": export.get_default_export_path(),
-            "exportShaderParams": False,
-            "defaultExportPreset": "ID Map Export",
-            "exportPresets": [{
-                "name": "ID Map Export",
-                "maps": [{
-                    "fileName": f"$mesh_$textureSet_ID{udim_suffix}",
-                    "channels": [
-                        {"destChannel": c, "srcChannel": c,
-                         "srcMapType": "DocumentMap", "srcMapName": "BaseColor"}
-                        for c in "RGBA"
-                    ],
-                    "parameters": {"bitDepth": "8", "dithering": False, "fileFormat": "png"},
-                }],
-            }],
-            "exportList": [{"rootPath": ts_info.name}],
-            "exportParameters": [{"parameters": {"dithering": False, "paddingAlgorithm": "infinite"}}],
-            "uvTiles": ts_info.uv_tiles_coordinates,
-        }
-
-        exported = TextureExporter().export_textures(export_config)
+        exported = TextureExporter().export_textures(_build_id_map_export_config(ts_info))
         if not exported:
             return
 
@@ -404,30 +405,7 @@ def swap_id_map_color(source_color, target_color):
         # Export temp_group as a new ID map (BaseColor only)
         layerstack.set_selected_nodes([temp_group])
         ts_info = vg_project_info.TextureSetInfo().get_info()
-        udim_suffix = '.$udim' if ts_info.texture_set.has_uv_tiles() else ''
-
-        export_config = {
-            "exportPath": export.get_default_export_path(),
-            "exportShaderParams": False,
-            "defaultExportPreset": "ID Map Export",
-            "exportPresets": [{
-                "name": "ID Map Export",
-                "maps": [{
-                    "fileName": f"$mesh_$textureSet_ID{udim_suffix}",
-                    "channels": [
-                        {"destChannel": c, "srcChannel": c,
-                         "srcMapType": "DocumentMap", "srcMapName": "BaseColor"}
-                        for c in "RGBA"
-                    ],
-                    "parameters": {"bitDepth": "8", "dithering": False, "fileFormat": "png"},
-                }],
-            }],
-            "exportList": [{"rootPath": ts_info.name}],
-            "exportParameters": [{"parameters": {"dithering": False, "paddingAlgorithm": "infinite"}}],
-            "uvTiles": ts_info.uv_tiles_coordinates,
-        }
-
-        exported = TextureExporter().export_textures(export_config)
+        exported = TextureExporter().export_textures(_build_id_map_export_config(ts_info))
         if not exported:
             return
 
