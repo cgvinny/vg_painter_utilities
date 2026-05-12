@@ -485,8 +485,7 @@ def close_plugin():
     _collection_dock = None
     if _palette_panel is not None:
         try:
-            _palette_panel._poll_timer.stop()
-            _palette_panel._disconnect_events()
+            _palette_panel.cleanup()
         except Exception:
             pass
     if _palette_dock is not None:
@@ -508,8 +507,7 @@ def reload_plugin():
 
     if _palette_panel is not None:
         try:
-            _palette_panel._poll_timer.stop()
-            _palette_panel._disconnect_events()
+            _palette_panel.cleanup()
         except Exception:
             pass
     if _palette_dock is not None:

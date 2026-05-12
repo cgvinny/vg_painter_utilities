@@ -843,9 +843,13 @@ class PalettePanel(QtWidgets.QWidget):
         except Exception:
             pass
 
-    def closeEvent(self, e):
+    def cleanup(self):
+        """Stop the poll timer and disconnect Painter events. Safe to call multiple times."""
         self._poll_timer.stop()
         self._disconnect_events()
+
+    def closeEvent(self, e):
+        self.cleanup()
         super().closeEvent(e)
 
     def _active_ts_name(self):
