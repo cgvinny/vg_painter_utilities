@@ -16,6 +16,7 @@ from PySide6 import QtWidgets, QtGui
 from PySide6.QtCore import QTimer
 from PySide6.QtGui import QKeySequence
 import importlib
+from functools import partial
 
 from substance_painter import ui, logging
 from vg_pt_utils import vg_baking, vg_export, vg_layerstack, vg_project_info, vg_settings, vg_collection, vg_about, vg_palette
@@ -41,36 +42,14 @@ _palette_dock = None
 _startup_update_worker = None
 """Background thread for the silent startup update check."""
 
-### FILL LAYER FUNCTIONS ###
+### LAYER FUNCTIONS ###
 
-def new_fill_layer_base():
-    """Create a new fill layer with Base Color activated."""
-    layer_manager = vg_layerstack.LayerManager()
-    layer_manager.add_layer(layer_type='fill', active_channels=["BaseColor"], layer_name="New fill layer")
-
-def new_fill_layer_height():
-    """Create a new fill layer with Height channel activated."""
-    layer_manager = vg_layerstack.LayerManager()
-    layer_manager.add_layer(layer_type='fill', active_channels=["Height"], layer_name="New fill layer")
-
-def new_fill_layer_all():
-    """Create a new fill layer with all channels activated."""
-    layer_manager = vg_layerstack.LayerManager()
-    layer_manager.add_layer(layer_type='fill', layer_name="New fill layer")
-    
-
-def new_fill_layer_empty():
-    """Create a new fill layer with no channels activated."""
-    layer_manager = vg_layerstack.LayerManager()
-    layer_manager.add_layer(layer_type='fill', active_channels=[""], layer_name="New fill layer")
-
-
-### PAINT LAYER FUNCTIONS ###
+def _new_fill_layer(active_channels=None):
+    vg_layerstack.LayerManager().add_layer(layer_type='fill', active_channels=active_channels, layer_name="New fill layer")
 
 def new_paint_layer():
     """Create a new paint layer."""
-    layer_manager = vg_layerstack.LayerManager()
-    layer_manager.add_layer(layer_type='paint', layer_name="New Paint layer")
+    vg_layerstack.LayerManager().add_layer(layer_type='paint', layer_name="New Paint layer")
 
 ### MASK FUNCTIONS ###
 
@@ -101,16 +80,6 @@ def add_mask_popup():
 
 ### GENERATE CONTENT FROM STACK ###
 
-def create_layer_from_stack():
-    """Generate a layer from the visible content in the stack."""
-    vg_export.create_layer_from_stack()
-
-
-def create_layer_from_group():
-    """Generate a fill layer from the selected group's isolated content."""
-    vg_export.create_layer_from_group()
-
-
 def create_id_map_from_group():
     """Export the selected group as an ID map and assign it to the ID mesh map slot."""
     vg_export.create_id_map_from_group()
@@ -122,11 +91,6 @@ def id_color_swap():
     dlg = IDColorSwapDialog(ui.get_main_window())
     if dlg.exec() == QtWidgets.QDialog.Accepted:
         vg_export.swap_id_map_color(dlg.source_color(), dlg.target_color())
-
-
-def flatten_stack():
-    """Flatten the stack by exporting and importing textures."""
-    vg_export.flatten_stack()
 
 
 ### CREATE REFERENCE POINT LAYER ###
@@ -272,22 +236,19 @@ def open_settings():
 
 # Maps action IDs to their handler functions.
 _ACTION_FUNCS = {
-    "new_paint_layer":          lambda: new_paint_layer(),
-    "new_fill_layer_base":      lambda: new_fill_layer_base(),
-    "new_fill_layer_height":    lambda: new_fill_layer_height(),
-    "new_fill_layer_all":       lambda: new_fill_layer_all(),
-    "new_fill_layer_empty":     lambda: new_fill_layer_empty(),
-    "add_mask_popup":           lambda: add_mask_popup(),
-    "create_layer_from_stack":  lambda: create_layer_from_stack(),
-    "create_layer_from_group":  lambda: create_layer_from_group(),
-    "create_id_map_from_group":        lambda: create_id_map_from_group(),
-    "id_color_swap":                   lambda: id_color_swap(),
-    "palette_extractor":               lambda: open_palette_panel(),
-    "flatten_stack":            lambda: flatten_stack(),
-    "create_ref_point_layer":   lambda: create_ref_point_layer(),
-    "launch_quick_bake":        lambda: launch_quick_bake(),
-    "launch_bake_all":          lambda: launch_bake_all(),
-    "collection_panel":         lambda: open_collections_panel(),
+    "new_paint_layer":          new_paint_layer,
+    "new_fill_layer_base":      partial(_new_fill_layer, active_channels=["BaseColor"]),
+    "new_fill_layer_height":    partial(_new_fill_layer, active_channels=["Height"]),
+    "new_fill_layer_all":       _new_fill_layer,
+    "new_fill_layer_empty":     partial(_new_fill_layer, active_channels=[""]),
+    "add_mask_popup":           add_mask_popup,
+    "create_id_map_from_group": create_id_map_from_group,
+    "id_color_swap":            id_color_swap,
+    "palette_extractor":        open_palette_panel,
+    "create_ref_point_layer":   create_ref_point_layer,
+    "launch_quick_bake":        launch_quick_bake,
+    "launch_bake_all":          launch_bake_all,
+    "collection_panel":         open_collections_panel,
 }
 
 # Menu structure: action IDs interleaved with None for separators.
@@ -309,6 +270,8 @@ _MENU_STRUCTURE = [
     None,
     "launch_quick_bake",
     "launch_bake_all",
+    None,
+    "collection_panel",
 ]
 
 
@@ -335,18 +298,6 @@ def create_menu():
             if sc_str:
                 action.setShortcut(QKeySequence(sc_str))
             vg_utilities_menu.addAction(action)
-
-    # Collections panel entry
-    vg_utilities_menu.addSeparator()
-    sc_data = settings["shortcuts"].get("collection_panel", {})
-    sc_str = vg_settings.build_shortcut_string(
-        sc_data.get("modifier", ""), sc_data.get("key", "")
-    )
-    collections_action = QtGui.QAction("Collections…", vg_utilities_menu)
-    collections_action.triggered.connect(_ACTION_FUNCS["collection_panel"])
-    if sc_str:
-        collections_action.setShortcut(QKeySequence(sc_str))
-    vg_utilities_menu.addAction(collections_action)
 
     vg_utilities_menu.addSeparator()
     settings_action = QtGui.QAction("Settings...", vg_utilities_menu)
