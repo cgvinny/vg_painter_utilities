@@ -561,7 +561,7 @@ def save_viewport_thumbnail():
         logging.error("VG Export: screen grab returned an empty image.")
         return
 
-    if not pixmap.save(str(save_path)):
+    if not pixmap.save(str(save_path), "PNG"):
         logging.error(f"VG Export: could not write thumbnail to '{save_path}'.")
         return
 
