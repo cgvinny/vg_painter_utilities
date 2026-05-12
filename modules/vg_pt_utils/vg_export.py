@@ -12,7 +12,8 @@ in Substance 3D Painter, used to flatten or snapshot the layer stack.
 __author__ = "Vincent GAULT - Adobe"
 
 import os
-from substance_painter import export, textureset, resource, layerstack, logging
+from substance_painter import export, textureset, resource, layerstack, logging, colormanagement, ui
+from PySide6 import QtWidgets, QtGui, QtCore
 from vg_pt_utils import vg_layerstack, vg_project_info
 from vg_pt_utils.vg_layerstack import BLENDING_NORMAL
 
@@ -173,6 +174,86 @@ class TextureExporter:
         except Exception as e:
             logging.error(f"VG Export: texture export failed: {e}")
             return None
+
+
+class IDColorSwapDialog(QtWidgets.QDialog):
+    """Dialog for picking a source color and a replacement color for ID map swapping."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent or ui.get_main_window())
+        self.setWindowTitle("ID Color Swap")
+        self.setFixedWidth(280)
+        self._source = QtGui.QColor.fromRgbF(1.0, 0.0, 0.0)
+        self._target = QtGui.QColor.fromRgbF(0.0, 1.0, 0.0)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        swatches = QtWidgets.QHBoxLayout()
+        swatches.setSpacing(16)
+        self._src_btn = self._make_swatch_column(swatches, "Current color", self._source)
+        self._tgt_btn = self._make_swatch_column(swatches, "New color", self._target)
+        layout.addLayout(swatches)
+
+        self._src_btn.clicked.connect(self._pick_source)
+        self._tgt_btn.clicked.connect(self._pick_target)
+        layout.addSpacing(4)
+
+        swap_btn = QtWidgets.QPushButton("Swap Color")
+        swap_btn.setDefault(True)
+        swap_btn.clicked.connect(self.accept)
+        cancel_btn = QtWidgets.QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.addWidget(cancel_btn)
+        btn_row.addWidget(swap_btn)
+        layout.addLayout(btn_row)
+
+    def _make_swatch_column(self, parent_layout, label_text, color):
+        col = QtWidgets.QVBoxLayout()
+        col.setSpacing(4)
+        lbl = QtWidgets.QLabel(label_text)
+        lbl.setAlignment(QtCore.Qt.AlignCenter)
+        btn = QtWidgets.QPushButton()
+        btn.setFixedSize(100, 60)
+        btn.setCursor(QtCore.Qt.PointingHandCursor)
+        self._apply_color(btn, color)
+        col.addWidget(lbl)
+        col.addWidget(btn)
+        parent_layout.addLayout(col)
+        return btn
+
+    @staticmethod
+    def _apply_color(btn, qcolor):
+        pix = QtGui.QPixmap(btn.width() or 100, btn.height() or 60)
+        pix.fill(qcolor)
+        btn.setIcon(QtGui.QIcon(pix))
+        btn.setIconSize(btn.size())
+
+    def _pick_source(self):
+        qc = QtWidgets.QColorDialog.getColor(
+            self._source, self, "Current Color",
+            QtWidgets.QColorDialog.DontUseNativeDialog,
+        )
+        if qc.isValid():
+            self._source = qc
+            self._apply_color(self._src_btn, qc)
+
+    def _pick_target(self):
+        qc = QtWidgets.QColorDialog.getColor(
+            self._target, self, "New Color",
+            QtWidgets.QColorDialog.DontUseNativeDialog,
+        )
+        if qc.isValid():
+            self._target = qc
+            self._apply_color(self._tgt_btn, qc)
+
+    def source_color(self):
+        return colormanagement.Color(self._source.redF(), self._source.greenF(), self._source.blueF())
+
+    def target_color(self):
+        return colormanagement.Color(self._target.redF(), self._target.greenF(), self._target.blueF())
 
 
 ##### FUNCTIONS USING THE CLASSES #####
