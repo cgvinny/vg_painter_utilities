@@ -18,7 +18,7 @@ from PySide6.QtGui import QKeySequence
 import importlib
 from functools import partial
 
-from substance_painter import ui, logging
+from substance_painter import ui, logging, event
 from vg_pt_utils import vg_baking, vg_export, vg_layerstack, vg_project_info, vg_settings, vg_collection, vg_about, vg_palette
 
 plugin_menus_widgets = []
@@ -41,6 +41,9 @@ _palette_dock = None
 
 _startup_update_worker = None
 """Background thread for the silent startup update check."""
+
+_auto_thumbnail_action = None
+"""Checkable menu action for Auto Thumbnail — kept alive to stay in sync with the setting."""
 
 ### LAYER FUNCTIONS ###
 
@@ -220,6 +223,51 @@ def _run_startup_update_check():
     _startup_update_worker.start()
 
 
+### AUTO THUMBNAIL ###
+
+def _on_project_saved(e):
+    if vg_settings.load_settings().get("auto_thumbnail", False):
+        vg_export.save_viewport_thumbnail(silent=True)
+
+
+def _on_project_opened(e):
+    if vg_settings.load_settings().get("auto_thumbnail", False):
+        QTimer.singleShot(1000, lambda: vg_export.save_viewport_thumbnail(silent=True))
+
+
+def _on_project_created(e):
+    if vg_settings.load_settings().get("auto_thumbnail", False):
+        QTimer.singleShot(1000, lambda: vg_export.save_viewport_thumbnail(silent=True))
+
+
+def _connect_auto_thumbnail_events():
+    event.DISPATCHER.connect_strong(event.ProjectSaved,   _on_project_saved)
+    event.DISPATCHER.connect_strong(event.ProjectOpened,  _on_project_opened)
+    event.DISPATCHER.connect_strong(event.ProjectCreated, _on_project_created)
+
+
+def _disconnect_auto_thumbnail_events():
+    for ev, cb in [
+        (event.ProjectSaved,   _on_project_saved),
+        (event.ProjectOpened,  _on_project_opened),
+        (event.ProjectCreated, _on_project_created),
+    ]:
+        try:
+            event.DISPATCHER.disconnect(ev, cb)
+        except Exception:
+            pass
+
+
+def toggle_auto_thumbnail():
+    """Toggle the auto thumbnail setting and update the menu action check state."""
+    settings = vg_settings.load_settings()
+    new_state = not settings.get("auto_thumbnail", False)
+    settings["auto_thumbnail"] = new_state
+    vg_settings.save_settings(settings)
+    if _auto_thumbnail_action is not None:
+        _auto_thumbnail_action.setChecked(new_state)
+
+
 ### SETTINGS ###
 
 def open_settings():
@@ -308,6 +356,14 @@ def create_menu():
             vg_utilities_menu.addAction(action)
 
     vg_utilities_menu.addSeparator()
+    global _auto_thumbnail_action
+    _auto_thumbnail_action = QtGui.QAction("Auto Thumbnail on Save", vg_utilities_menu)
+    _auto_thumbnail_action.setCheckable(True)
+    _auto_thumbnail_action.setChecked(settings.get("auto_thumbnail", False))
+    _auto_thumbnail_action.triggered.connect(toggle_auto_thumbnail)
+    vg_utilities_menu.addAction(_auto_thumbnail_action)
+
+    vg_utilities_menu.addSeparator()
     settings_action = QtGui.QAction("Settings...", vg_utilities_menu)
     settings_action.triggered.connect(open_settings)
     vg_utilities_menu.addAction(settings_action)
@@ -323,6 +379,7 @@ def start_plugin():
     """Called when the plugin is started."""
     create_menu()
     vg_collection.flush_pending_deletions()
+    _connect_auto_thumbnail_events()
     settings = vg_settings.load_settings()
     if settings.get("collection_panel_open", False):
         QTimer.singleShot(500, open_collections_panel)
@@ -334,7 +391,9 @@ def start_plugin():
 
 def close_plugin():
     """Called when the plugin is stopped."""
-    global _mask_popup_menu, _collection_panel, _collection_dock, _palette_panel, _palette_dock
+    global _mask_popup_menu, _collection_panel, _collection_dock, _palette_panel, _palette_dock, _auto_thumbnail_action
+    _disconnect_auto_thumbnail_events()
+    _auto_thumbnail_action = None
 
     # Save panel visibility BEFORE any cleanup — shutdown signals would overwrite with False.
     settings = vg_settings.load_settings()

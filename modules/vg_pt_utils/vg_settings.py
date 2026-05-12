@@ -63,7 +63,8 @@ DEFAULT_SETTINGS = {
     },
     "pending_delete_collections": [],
     "collection_panel_open": False,
-    "palette_panel_open": False
+    "palette_panel_open": False,
+    "auto_thumbnail": False,
 }
 
 

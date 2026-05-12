@@ -567,23 +567,30 @@ def _find_viewport_rect(main_window):
         return None
 
 
-def save_viewport_thumbnail():
+def save_viewport_thumbnail(silent: bool = False):
     """
     Capture the 3D viewport and save it as a PNG next to the .spp file.
     The output file takes the same base name as the project (e.g. my_project.png).
     Falls back to the full window if the viewport widget cannot be located.
     Does nothing if the project has never been saved.
+
+    Args:
+        silent: When True, suppresses QMessageBox dialogs and logs warnings
+                instead — intended for auto-save mode.
     """
     if not project.is_open():
         return
 
     spp_path = project.file_path()
     if not spp_path:
-        QtWidgets.QMessageBox.warning(
-            ui.get_main_window(),
-            "Save Thumbnail",
-            "Save the project first — the thumbnail is placed next to the .spp file.",
-        )
+        if silent:
+            logging.warning("VG Export: auto thumbnail skipped — project has no file path yet.")
+        else:
+            QtWidgets.QMessageBox.warning(
+                ui.get_main_window(),
+                "Save Thumbnail",
+                "Save the project first — the thumbnail is placed next to the .spp file.",
+            )
         return
 
     save_path = pathlib.Path(spp_path).with_suffix(".png")
@@ -617,11 +624,14 @@ def save_viewport_thumbnail():
     try:
         save_path.write_bytes(bytes(byte_array))
     except OSError:
-        QtWidgets.QMessageBox.warning(
-            ui.get_main_window(),
-            "Save Thumbnail",
-            f"Could not save the thumbnail — write access denied:\n{save_path}",
-        )
+        if silent:
+            logging.warning(f"VG Export: auto thumbnail could not be written to '{save_path}' — access denied.")
+        else:
+            QtWidgets.QMessageBox.warning(
+                ui.get_main_window(),
+                "Save Thumbnail",
+                f"Could not save the thumbnail — write access denied:\n{save_path}",
+            )
         return
 
     logging.info(f"VG Export: thumbnail saved → '{save_path}'")
