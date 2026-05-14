@@ -19,7 +19,7 @@ import importlib
 from functools import partial
 
 from substance_painter import ui, logging, event
-from vg_pt_utils import vg_baking, vg_export, vg_layerstack, vg_project_info, vg_settings, vg_collection, vg_about, vg_palette
+from vg_pt_utils import vg_baking, vg_export, vg_layerstack, vg_project_info, vg_settings, vg_collection, vg_about, vg_palette, vg_organic_blending
 
 plugin_menus_widgets = []
 """Keeps track of added UI elements for cleanup."""
@@ -38,6 +38,12 @@ _palette_panel = None
 
 _palette_dock = None
 """The QDockWidget wrapping the palette panel, returned by ui.add_dock_widget()."""
+
+_organic_panel = None
+"""The OrganicBlendingPanel widget instance — kept alive to prevent garbage collection."""
+
+_organic_dock = None
+"""The QDockWidget wrapping the organic blending panel, returned by ui.add_dock_widget()."""
 
 _startup_update_worker = None
 """Background thread for the silent startup update check."""
@@ -186,6 +192,36 @@ def open_palette_panel():
     _save_palette_panel_state(True)
 
 
+### ORGANIC BLENDING ###
+
+def _save_organic_panel_state(visible: bool):
+    """Persist the Organic Blending panel open/closed state to settings."""
+    settings = vg_settings.load_settings()
+    settings["organic_blending_panel_open"] = visible
+    vg_settings.save_settings(settings)
+
+
+def open_organic_blending_panel():
+    """Open (or raise) the Organic Blending dockable panel."""
+    global _organic_panel, _organic_dock
+
+    if _organic_dock is not None:
+        try:
+            _organic_dock.show()
+            _organic_dock.raise_()
+            return
+        except RuntimeError:
+            _organic_dock = None
+            _organic_panel = None
+
+    _organic_panel = vg_organic_blending.OrganicBlendingPanel()
+    _organic_dock = ui.add_dock_widget(_organic_panel)
+    plugin_menus_widgets.append(_organic_dock)
+
+    _organic_dock.visibilityChanged.connect(_save_organic_panel_state)
+    _save_organic_panel_state(True)
+
+
 ### QUICK BAKE ###
 
 def launch_quick_bake():
@@ -276,7 +312,7 @@ def open_settings():
     dlg = SettingsDialog(ui.get_main_window())
     if dlg.exec() == QtWidgets.QDialog.Accepted:
         # Preserve dock widgets across the menu rebuild.
-        docks = [w for w in plugin_menus_widgets if w in (_collection_dock, _palette_dock)]
+        docks = [w for w in plugin_menus_widgets if w in (_collection_dock, _palette_dock, _organic_dock)]
         menus = [w for w in plugin_menus_widgets if w not in docks]
         for widget in menus:
             ui.delete_ui_element(widget)
@@ -302,6 +338,7 @@ _ACTION_FUNCS = {
     "launch_quick_bake":        launch_quick_bake,
     "launch_bake_all":          launch_bake_all,
     "collection_panel":         open_collections_panel,
+    "organic_blending":         open_organic_blending_panel,
 }
 
 # Menu structure: action IDs interleaved with None for separators.
@@ -325,6 +362,7 @@ _MENU_STRUCTURE = [
     "launch_bake_all",
     None,
     "collection_panel",
+    "organic_blending",
 ]
 
 
@@ -399,13 +437,15 @@ def start_plugin():
         QTimer.singleShot(500, open_collections_panel)
     if settings.get("palette_panel_open", False):
         QTimer.singleShot(500, open_palette_panel)
+    if settings.get("organic_blending_panel_open", False):
+        QTimer.singleShot(500, open_organic_blending_panel)
     logging.info("VG Menu Activated")
     QTimer.singleShot(8000, _run_startup_update_check)
     
 
 def close_plugin():
     """Called when the plugin is stopped."""
-    global _mask_popup_menu, _collection_panel, _collection_dock, _palette_panel, _palette_dock, _auto_snapshot_action
+    global _mask_popup_menu, _collection_panel, _collection_dock, _palette_panel, _palette_dock, _organic_panel, _organic_dock, _auto_snapshot_action
     _disconnect_auto_snapshot_events()
     _auto_snapshot_action = None
 
@@ -419,6 +459,11 @@ def close_plugin():
     if _palette_dock is not None:
         try:
             settings["palette_panel_open"] = _palette_dock.isVisible()
+        except RuntimeError:
+            pass
+    if _organic_dock is not None:
+        try:
+            settings["organic_blending_panel_open"] = _organic_dock.isVisible()
         except RuntimeError:
             pass
     vg_settings.save_settings(settings)
@@ -446,6 +491,18 @@ def close_plugin():
             pass
     _palette_panel = None
     _palette_dock = None
+    if _organic_panel is not None:
+        try:
+            _organic_panel.cleanup()
+        except Exception:
+            pass
+    if _organic_dock is not None:
+        try:
+            _organic_dock.visibilityChanged.disconnect(_save_organic_panel_state)
+        except RuntimeError:
+            pass
+    _organic_panel = None
+    _organic_dock = None
     for widget in plugin_menus_widgets:
         ui.delete_ui_element(widget)
     plugin_menus_widgets.clear()
@@ -454,7 +511,7 @@ def close_plugin():
 
 def reload_plugin():
     """Reload plugin modules and recreate the menu."""
-    global _collection_panel, _collection_dock, _palette_panel, _palette_dock
+    global _collection_panel, _collection_dock, _palette_panel, _palette_dock, _organic_panel, _organic_dock
 
     if _palette_panel is not None:
         try:
@@ -484,12 +541,28 @@ def reload_plugin():
         _collection_dock = None
         _collection_panel = None
 
+    if _organic_panel is not None:
+        try:
+            _organic_panel.cleanup()
+        except Exception:
+            pass
+    if _organic_dock is not None:
+        try:
+            ui.delete_ui_element(_organic_dock)
+            if _organic_dock in plugin_menus_widgets:
+                plugin_menus_widgets.remove(_organic_dock)
+        except Exception:
+            pass
+        _organic_dock = None
+        _organic_panel = None
+
     importlib.reload(vg_settings)
     importlib.reload(vg_layerstack)
     importlib.reload(vg_export)
     importlib.reload(vg_baking)
     importlib.reload(vg_project_info)
     importlib.reload(vg_palette)
+    importlib.reload(vg_organic_blending)
     importlib.reload(vg_collection)
     importlib.reload(vg_about)
     from vg_pt_utils import vg_settings_dialog

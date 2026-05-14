@@ -38,6 +38,7 @@ ACTION_LABELS = {
     "launch_quick_bake":        "Quick Bake",
     "launch_bake_all":          "Bake All Texture Sets",
     "collection_panel":         "Collections — Open Panel",
+    "organic_blending":         "Organic Blending — Open Panel",
     "save_viewport_snapshot":  "Save Viewport Snapshot",
 }
 
@@ -56,6 +57,7 @@ DEFAULT_SETTINGS = {
         "launch_quick_bake":        {"modifier": "Ctrl",        "key": "B"},
         "launch_bake_all":          {"modifier": "Ctrl+Shift",  "key": "B"},
         "collection_panel":         {"modifier": "",            "key": ""},
+        "organic_blending":         {"modifier": "",            "key": ""},
         "save_viewport_snapshot":  {"modifier": "",            "key": ""},
     },
     "ref_point": {
@@ -64,6 +66,7 @@ DEFAULT_SETTINGS = {
     "pending_delete_collections": [],
     "collection_panel_open": False,
     "palette_panel_open": False,
+    "organic_blending_panel_open": False,
     "auto_snapshot": False,
 }
 
