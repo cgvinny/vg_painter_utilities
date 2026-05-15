@@ -266,32 +266,15 @@ def _on_project_saved(e):
         vg_export.save_viewport_snapshot(silent=True)
 
 
-def _on_project_opened(e):
-    if vg_settings.load_settings().get("auto_snapshot", False):
-        QTimer.singleShot(1000, lambda: vg_export.save_viewport_snapshot(silent=True))
-
-
-def _on_project_created(e):
-    if vg_settings.load_settings().get("auto_snapshot", False):
-        QTimer.singleShot(1000, lambda: vg_export.save_viewport_snapshot(silent=True))
-
-
 def _connect_auto_snapshot_events():
-    event.DISPATCHER.connect_strong(event.ProjectSaved,   _on_project_saved)
-    event.DISPATCHER.connect_strong(event.ProjectOpened,  _on_project_opened)
-    event.DISPATCHER.connect_strong(event.ProjectCreated, _on_project_created)
+    event.DISPATCHER.connect_strong(event.ProjectSaved, _on_project_saved)
 
 
 def _disconnect_auto_snapshot_events():
-    for ev, cb in [
-        (event.ProjectSaved,   _on_project_saved),
-        (event.ProjectOpened,  _on_project_opened),
-        (event.ProjectCreated, _on_project_created),
-    ]:
-        try:
-            event.DISPATCHER.disconnect(ev, cb)
-        except Exception:
-            pass
+    try:
+        event.DISPATCHER.disconnect(event.ProjectSaved, _on_project_saved)
+    except Exception:
+        pass
 
 
 def toggle_auto_snapshot():
@@ -410,7 +393,7 @@ def create_menu():
     _auto_snapshot_action.setCheckable(True)
     _auto_snapshot_action.setChecked(settings.get("auto_snapshot", False))
     _auto_snapshot_action.setToolTip(
-        "Automatically saves a viewport snapshot whenever the project is opened, created, or saved."
+        "Automatically saves a viewport snapshot whenever the project is saved."
     )
     _auto_snapshot_action.triggered.connect(toggle_auto_snapshot)
     vg_utilities_menu.addAction(_auto_snapshot_action)
