@@ -487,7 +487,8 @@ class OrganicBlendingPanel(QtWidgets.QWidget):
         current = self._state.levels_node.get_parameters()
 
         center = self._height_slider.value() * 2.0 - 1.0   # [0,1] → [-1,+1]
-        half = self._top_amp_slider.value() / 100.0        # % → [0,1]
+        scale = self._scale_slider.value() if self._state.has_fill_projection else 1.0
+        half = (self._top_amp_slider.value() / 100.0) / max(scale, 0.01)
 
         # Compress spread to fit within [-1, +1]: at the extremes (center = ±1)
         # both bounds converge to the boundary, covering the material fully.
