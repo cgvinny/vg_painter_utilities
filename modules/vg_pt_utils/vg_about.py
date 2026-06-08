@@ -20,6 +20,11 @@ from PySide6.QtCore import Qt
 
 from substance_painter import ui, logging
 
+# imported lazily to avoid circular imports at module load time
+def _vg_settings():
+    from vg_pt_utils import vg_settings
+    return vg_settings
+
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -268,3 +273,110 @@ class AboutDialog(QtWidgets.QDialog):
             )
         else:
             self._update_lbl.setText('<font color="#55aa55">&#10003; You are up to date.</font>')
+
+
+# ---------------------------------------------------------------------------
+# Startup update toast
+# ---------------------------------------------------------------------------
+
+class UpdateToast(QtWidgets.QWidget):
+    """
+    Small non-blocking banner shown once at startup when a new version is
+    available. Auto-dismisses after ``_TIMEOUT_MS`` milliseconds, or can be
+    closed manually. A "don't show again for this version" checkbox lets
+    production users suppress the banner until the next release.
+    """
+
+    _TIMEOUT_MS = 12_000
+
+    def __init__(self, version: str, url: str, parent=None):
+        super().__init__(parent or ui.get_main_window())
+        self.setWindowFlags(Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_DeleteOnClose)
+        self._version = version
+        self._build_ui(version, url)
+        self._position()
+
+        self._timer = QtCore.QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self._close_and_save)
+        self._timer.start(self._TIMEOUT_MS)
+
+    def _build_ui(self, version: str, url: str):
+        root = QtWidgets.QVBoxLayout(self)
+        root.setContentsMargins(14, 10, 10, 10)
+        root.setSpacing(6)
+
+        self.setStyleSheet(
+            "UpdateToast { background: #2a2000; border: 1px solid #f0a030; border-radius: 6px; }"
+        )
+
+        # -- Top row: icon + text + close button --
+        top_row = QtWidgets.QHBoxLayout()
+        top_row.setSpacing(12)
+
+        icon_lbl = QtWidgets.QLabel("🔔")
+        icon_lbl.setStyleSheet("background: transparent; font-size: 16px;")
+        top_row.addWidget(icon_lbl)
+
+        text_lbl = QtWidgets.QLabel(
+            f'<span style="color:#f0a030; font-weight:bold;">VG Utilities {version} available</span><br>'
+            f'<a href="{url}" style="color:#6aabdc;">Download on GitHub</a>'
+        )
+        text_lbl.setTextFormat(Qt.RichText)
+        text_lbl.setOpenExternalLinks(True)
+        text_lbl.setStyleSheet("background: transparent; font-size: 11px;")
+        top_row.addWidget(text_lbl, 1)
+
+        close_btn = QtWidgets.QPushButton("✕")
+        close_btn.setFixedSize(20, 20)
+        close_btn.setFlat(True)
+        close_btn.setCursor(Qt.PointingHandCursor)
+        close_btn.setStyleSheet(
+            "QPushButton { color: #888; background: transparent; border: none; font-size: 12px; }"
+            "QPushButton:hover { color: #e0e0e0; }"
+        )
+        close_btn.clicked.connect(self._close_and_save)
+        top_row.addWidget(close_btn)
+        root.addLayout(top_row)
+
+        # -- Bottom row: snooze checkbox --
+        self._snooze_cb = QtWidgets.QCheckBox("Don't show again for this version")
+        self._snooze_cb.setStyleSheet(
+            "QCheckBox { color: #777; font-size: 10px; background: transparent; }"
+            "QCheckBox::indicator { width: 11px; height: 11px; }"
+        )
+        root.addWidget(self._snooze_cb)
+
+        self.adjustSize()
+
+    def _close_and_save(self):
+        if self._snooze_cb.isChecked():
+            s = _vg_settings()
+            settings = s.load_settings()
+            settings["update_toast_snoozed_version"] = self._version
+            s.save_settings(settings)
+        self.close()
+
+    def _position(self):
+        parent = self.parentWidget()
+        if parent:
+            pr = parent.geometry()
+            self.move(pr.right() - self.width() - 20, pr.bottom() - self.height() - 40)
+        else:
+            screen = QtWidgets.QApplication.primaryScreen().availableGeometry()
+            self.move(screen.right() - self.width() - 20, screen.bottom() - self.height() - 40)
+
+
+def show_startup_toast(version: str, url: str) -> UpdateToast:
+    """
+    Show the update toast, unless the user already snoozed this exact version.
+    Returns the widget, or None if suppressed.
+    """
+    s = _vg_settings()
+    settings = s.load_settings()
+    if settings.get("update_toast_snoozed_version") == version:
+        return None
+    toast = UpdateToast(version, url)
+    toast.show()
+    return toast

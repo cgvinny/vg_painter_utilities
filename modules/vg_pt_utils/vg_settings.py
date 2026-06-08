@@ -68,6 +68,8 @@ DEFAULT_SETTINGS = {
     "palette_panel_open": False,
     "organic_blending_panel_open": False,
     "auto_snapshot": False,
+    "channel_overlay_enabled": True,
+    "update_toast_snoozed_version": "",
 }
 
 

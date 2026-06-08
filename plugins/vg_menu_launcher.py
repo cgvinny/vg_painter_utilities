@@ -19,7 +19,7 @@ import importlib
 from functools import partial
 
 from substance_painter import ui, logging, event
-from vg_pt_utils import vg_baking, vg_export, vg_layerstack, vg_project_info, vg_settings, vg_collection, vg_about, vg_palette, vg_organic_blending
+from vg_pt_utils import vg_baking, vg_export, vg_layerstack, vg_project_info, vg_settings, vg_collection, vg_about, vg_palette, vg_organic_blending, vg_channel_overlay
 
 plugin_menus_widgets = []
 """Keeps track of added UI elements for cleanup."""
@@ -46,10 +46,14 @@ _organic_dock = None
 """The QDockWidget wrapping the organic blending panel, returned by ui.add_dock_widget()."""
 
 _startup_update_worker = None
+_startup_update_toast  = None
 """Background thread for the silent startup update check."""
 
 _auto_snapshot_action = None
 """Checkable menu action for Auto Thumbnail — kept alive to stay in sync with the setting."""
+
+_channel_overlay = None
+"""ChannelOverlay widget instance — kept alive to prevent garbage collection."""
 
 ### LAYER FUNCTIONS ###
 
@@ -243,16 +247,15 @@ def open_about():
 
 
 def _run_startup_update_check():
-    """Silent background update check at startup — logs to Painter console if outdated."""
-    global _startup_update_worker
+    """Silent background update check at startup — shows a toast banner if outdated."""
+    global _startup_update_worker, _startup_update_toast
 
-    from vg_pt_utils.vg_about import _UpdateWorker, _RELEASES_URL
+    from vg_pt_utils.vg_about import _UpdateWorker, show_startup_toast
 
     def _on_result(result):
+        global _startup_update_toast
         if result and result["is_newer"]:
-            logging.info(
-                f"VG Utilities: version {result['version']} is available — {_RELEASES_URL}"
-            )
+            _startup_update_toast = show_startup_toast(result["version"], result["url"])
 
     _startup_update_worker = _UpdateWorker()
     _startup_update_worker.finished.connect(_on_result)
@@ -285,6 +288,64 @@ def toggle_auto_snapshot():
     vg_settings.save_settings(settings)
     if _auto_snapshot_action is not None:
         _auto_snapshot_action.setChecked(new_state)
+
+
+### CHANNEL OVERLAY ###
+
+_channel_overlay_action = None
+"""Checkable menu action for the channel overlay — kept alive to stay in sync."""
+
+
+def toggle_channel_overlay():
+    """Toggle the channel overlay show/hide setting and create or destroy the widget."""
+    global _channel_overlay
+    settings = vg_settings.load_settings()
+    new_state = not settings.get("channel_overlay_enabled", True)
+    settings["channel_overlay_enabled"] = new_state
+    vg_settings.save_settings(settings)
+    if _channel_overlay_action is not None:
+        _channel_overlay_action.setChecked(new_state)
+
+    if new_state:
+        # Re-enabling: destroy any stale instance and reset position so the bar
+        # always reappears at its default location (not wherever it drifted to).
+        if _channel_overlay is not None:
+            try:
+                _channel_overlay.cleanup()
+                _channel_overlay.deleteLater()
+            except Exception:
+                pass
+            _channel_overlay = None
+        _reset_overlay_position()
+        _channel_overlay = vg_channel_overlay.ChannelOverlay(ui.get_main_window())
+    else:
+        # Hide: destroy
+        if _channel_overlay is not None:
+            try:
+                _channel_overlay.cleanup()
+                _channel_overlay.deleteLater()
+            except Exception:
+                pass
+            _channel_overlay = None
+
+
+def reset_channel_overlay_position():
+    """Reset the channel overlay to its default viewport position."""
+    global _channel_overlay
+    _reset_overlay_position()
+    if _channel_overlay is not None:
+        try:
+            _channel_overlay.reset_position()
+        except Exception:
+            pass
+
+
+def _reset_overlay_position():
+    """Clear the saved offset from settings (position reset helper)."""
+    s = vg_settings.load_settings()
+    s["channel_overlay_offset_x"] = 0
+    s["channel_overlay_offset_y"] = 0
+    vg_settings.save_settings(s)
 
 
 ### SETTINGS ###
@@ -398,6 +459,22 @@ def create_menu():
     _auto_snapshot_action.triggered.connect(toggle_auto_snapshot)
     vg_utilities_menu.addAction(_auto_snapshot_action)
 
+    global _channel_overlay_action
+    _channel_overlay_action = QtGui.QAction("Channel Overlay Bar", vg_utilities_menu)
+    _channel_overlay_action.setCheckable(True)
+    _channel_overlay_action.setChecked(settings.get("channel_overlay_enabled", True))
+    _channel_overlay_action.setToolTip(
+        "Show the floating channel toggle bar over the viewport. "
+        "Re-enabling resets position to default."
+    )
+    _channel_overlay_action.triggered.connect(toggle_channel_overlay)
+    vg_utilities_menu.addAction(_channel_overlay_action)
+
+    reset_overlay_action = QtGui.QAction("Reset Channel Overlay Position", vg_utilities_menu)
+    reset_overlay_action.setToolTip("Move the channel bar back to its default viewport position.")
+    reset_overlay_action.triggered.connect(reset_channel_overlay_position)
+    vg_utilities_menu.addAction(reset_overlay_action)
+
     vg_utilities_menu.addSeparator()
     settings_action = QtGui.QAction("Settings...", vg_utilities_menu)
     settings_action.triggered.connect(open_settings)
@@ -412,6 +489,7 @@ def create_menu():
 
 def start_plugin():
     """Called when the plugin is started."""
+    global _channel_overlay
     create_menu()
     vg_collection.flush_pending_deletions()
     _connect_auto_snapshot_events()
@@ -422,15 +500,27 @@ def start_plugin():
         QTimer.singleShot(500, open_palette_panel)
     if settings.get("organic_blending_panel_open", False):
         QTimer.singleShot(500, open_organic_blending_panel)
+    # Clean up any pre-existing overlay (e.g. created by reload_plugin) before
+    # making a new one so we never end up with two overlapping bars.
+    if _channel_overlay is not None:
+        try:
+            _channel_overlay.cleanup()
+            _channel_overlay.deleteLater()
+        except Exception:
+            pass
+        _channel_overlay = None
+    if settings.get("channel_overlay_enabled", True):
+        _channel_overlay = vg_channel_overlay.ChannelOverlay(ui.get_main_window())
     logging.info("VG Menu Activated")
     QTimer.singleShot(8000, _run_startup_update_check)
     
 
 def close_plugin():
     """Called when the plugin is stopped."""
-    global _mask_popup_menu, _collection_panel, _collection_dock, _palette_panel, _palette_dock, _organic_panel, _organic_dock, _auto_snapshot_action
+    global _mask_popup_menu, _collection_panel, _collection_dock, _palette_panel, _palette_dock, _organic_panel, _organic_dock, _auto_snapshot_action, _channel_overlay, _channel_overlay_action
     _disconnect_auto_snapshot_events()
     _auto_snapshot_action = None
+    _channel_overlay_action = None
 
     # Save panel visibility BEFORE any cleanup — shutdown signals would overwrite with False.
     settings = vg_settings.load_settings()
@@ -486,6 +576,13 @@ def close_plugin():
             pass
     _organic_panel = None
     _organic_dock = None
+    if _channel_overlay is not None:
+        try:
+            _channel_overlay.cleanup()
+            _channel_overlay.deleteLater()
+        except Exception:
+            pass
+    _channel_overlay = None
     for widget in plugin_menus_widgets:
         ui.delete_ui_element(widget)
     plugin_menus_widgets.clear()
@@ -539,6 +636,14 @@ def reload_plugin():
         _organic_dock = None
         _organic_panel = None
 
+    if _channel_overlay is not None:
+        try:
+            _channel_overlay.cleanup()
+            _channel_overlay.deleteLater()
+        except Exception:
+            pass
+    globals()["_channel_overlay"] = None
+
     importlib.reload(vg_settings)
     importlib.reload(vg_layerstack)
     importlib.reload(vg_export)
@@ -546,12 +651,16 @@ def reload_plugin():
     importlib.reload(vg_project_info)
     importlib.reload(vg_palette)
     importlib.reload(vg_organic_blending)
+    importlib.reload(vg_channel_overlay)
     importlib.reload(vg_collection)
     importlib.reload(vg_about)
     from vg_pt_utils import vg_settings_dialog
     importlib.reload(vg_settings_dialog)
     from vg_pt_utils import vg_collection_dialog
     importlib.reload(vg_collection_dialog)
+
+    if vg_settings.load_settings().get("channel_overlay_enabled", True):
+        globals()["_channel_overlay"] = vg_channel_overlay.ChannelOverlay(ui.get_main_window())
 
 if __name__ == "__main__":
     reload_plugin()
