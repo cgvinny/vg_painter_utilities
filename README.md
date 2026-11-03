@@ -129,7 +129,7 @@ Applies a collection's Smart Material to **every Texture Set in every `.spp` pro
 
 ### Base Color Manager
 
-*VG Utilities → Base Color Manager* opens a dockable panel that scans the active Texture Set for fill layers with an active **Base Color** channel and displays their colors as an editable list.
+*VG Utilities → Base Color Manager* opens a dockable panel that scans all Texture Sets for fill layers with an active **Base Color** channel and displays their colors as an editable list.
 
 #### Features
 
@@ -138,12 +138,14 @@ Applies a collection's Smart Material to **every Texture Set in every `.spp` pro
 - **Drag a color** from the Applied Colors strip at the bottom onto any row swatch to apply it directly.
 - **Applied Colors strip** — records every color change made in the session. Click a swatch to apply it to the currently selected fill layer(s) in the stack.
 - **Ignore hidden layers** *(checked by default)* — skips layers that are not visible.
-- **Merge identical colors** — collapses rows that share the same color into a single row, so editing one updates all layers in the group simultaneously.
-- **Hue only** — when changing or dropping a color, only the Hue is replaced; each layer's original Saturation and Brightness are preserved.
+- **Group colors** — collapses layers that share the same color into a single row, so editing one updates all layers in the group simultaneously. The list covers **every Texture Set**.
+- **Similarity** — slider that also groups *similar* colors (perceptual distance, ΔE). At 0 only identical colors are grouped. Each layer in a group keeps its own color differences when a hue mode is used.
+- **Apply mode** — `Full color`, `Hue only` (keep each layer's Saturation and Brightness) or `Hue + saturation` (keep Brightness only), used when changing or dropping a color.
+- **Snapshots** — save named snapshots of every Base Color of every Texture Set (stored in the project file). A `Default` snapshot is taken the first time the panel opens on a project; restoring keeps an automatic backup.
+- **Adjust (relative)** — Saturation and Lightness sliders shift the checked rows (or all rows) relative to their current colors, with a live preview. Hold **Compare** to see the colors before the adjustment, **Apply** to keep it, **Reset** to undo it.
 - **Multi-color substances** — if a Substance material exposes multiple color parameters, each parameter gets its own row (e.g. *Terrazzo — Color1*, *Terrazzo — Grout Color*).
 - **Checkbox selection** — check multiple rows to apply a color change or a drag-and-drop to all of them at once. Clicking **×** on any row also removes all currently checked rows.
-- **Auto-refresh** — the list automatically updates when you switch to a different Texture Set.
-- **↺ button** — manually refresh the list at any time.
+- **↺ button** — rescan the project at any time (the list refreshes automatically when a project is opened or closed).
 
 ---
 
