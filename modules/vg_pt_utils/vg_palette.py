@@ -1843,17 +1843,26 @@ class PalettePanel(QtWidgets.QWidget):
         self._zero_sliders()
         self._clear_rows()
 
-        if ensure_default_snapshot():
-            self._snap_status.setText(f"'{DEFAULT_SNAPSHOT}' snapshot created from current colors.")
-        self._refresh_snapshots()
-
         self._project_was_open = project.is_open()
-        self._update_scope_label()
         if not self._project_was_open:
+            self._refresh_snapshots()
+            self._update_scope_label()
             self._add_info("No project open.")
             return
 
-        entries = collect_all(ignore_hidden=self._ignore_hidden_cb.isChecked())
+        # While a project is opening or closing, is_open() can already be True although the
+        # document is not readable yet (ValueError). Show a neutral message and leave
+        # _project_was_open unset so the poll timer retries on its next tick.
+        try:
+            if ensure_default_snapshot():
+                self._snap_status.setText(f"'{DEFAULT_SNAPSHOT}' snapshot created from current colors.")
+            self._refresh_snapshots()
+            self._update_scope_label()
+            entries = collect_all(ignore_hidden=self._ignore_hidden_cb.isChecked())
+        except ValueError:
+            self._project_was_open = None
+            self._add_info("Project loading…")
+            return
 
         if not entries:
             self._add_info("No fill layers with Base Color found.")
