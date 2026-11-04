@@ -404,17 +404,30 @@ _SPECTRUM_BUTTON_QSS = {
 }
 
 
+_SPECTRUM_BTN_ID = "vgSpectrumBtn"
+
+
+def _spectrum_qss(variant, extra):
+    """
+    Button stylesheet scoped by object name. An #id selector outranks Painter's own
+    global QPushButton rules (which otherwise stretch the buttons and square their corners).
+    """
+    scoped = (_SPECTRUM_BUTTON_QSS[variant] + "QPushButton { " + extra + " }").replace(
+        "QPushButton", f"QPushButton#{_SPECTRUM_BTN_ID}")
+    return scoped
+
+
 def _spectrum_button(text, variant="secondary", tooltip=""):
     """Pill button following Adobe Spectrum; stretches to share the row evenly."""
     btn = QtWidgets.QPushButton(text)
+    btn.setObjectName(_SPECTRUM_BTN_ID)
     btn.setFixedHeight(32)
     btn.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
     btn.setMinimumWidth(24)  # lets the button shrink with the panel instead of overflowing
     btn.setCursor(QtCore.Qt.PointingHandCursor)
-    btn.setStyleSheet(
-        _SPECTRUM_BUTTON_QSS[variant]
-        + "QPushButton { border-radius: 16px; padding: 0 8px; font-weight: bold; }"
-    )
+    btn.setStyleSheet(_spectrum_qss(
+        variant, "border-radius: 16px; padding: 0 8px; font-weight: bold; "
+                 "min-height: 32px; max-height: 32px;"))
     if tooltip:
         btn.setToolTip(tooltip)
     return btn
@@ -466,9 +479,13 @@ def _draw_icon(kind, color="#FFFFFF", size=16):
 def _spectrum_icon_button(kind, variant, tooltip):
     """Round 32px icon-only button; the tooltip carries the label."""
     btn = QtWidgets.QPushButton()
+    btn.setObjectName(_SPECTRUM_BTN_ID)
     btn.setFixedSize(32, 32)
+    btn.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
     btn.setCursor(QtCore.Qt.PointingHandCursor)
-    btn.setStyleSheet(_SPECTRUM_BUTTON_QSS[variant] + "QPushButton { border-radius: 16px; padding: 0; }")
+    btn.setStyleSheet(_spectrum_qss(
+        variant, "border-radius: 16px; padding: 0; "
+                 "min-width: 32px; max-width: 32px; min-height: 32px; max-height: 32px;"))
     btn.setIcon(_draw_icon(kind, "#FFFFFF" if variant == "accent" else "#E3E3E3"))
     btn.setIconSize(QtCore.QSize(16, 16))
     btn.setToolTip(tooltip)
@@ -507,7 +524,7 @@ class _DraggableSwatch(QtWidgets.QPushButton):
 
 class _DropTargetSwatch(QtWidgets.QPushButton):
     """Swatch button that accepts a color drop."""
-    color_dropped = QtCore.Signal(QtGui.QColor)
+    color_dropped = QtCore.Signal(QtGui.QColor, bool)   # (color, full color requested via Ctrl)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -523,7 +540,8 @@ class _DropTargetSwatch(QtWidgets.QPushButton):
         if event.mimeData().hasFormat(_COLOR_MIME_TYPE):
             color = QtGui.QColor(bytes(event.mimeData().data(_COLOR_MIME_TYPE)).decode())
             if color.isValid():
-                self.color_dropped.emit(color)
+                full = bool(event.modifiers() & QtCore.Qt.ControlModifier)
+                self.color_dropped.emit(color, full)
                 event.acceptProposedAction()
 
 
@@ -592,6 +610,29 @@ class _FlowLayout(QtWidgets.QLayout):
             x = next_x
             line_h = max(line_h, ih)
         return y + line_h - rect.y() + m.bottom()
+
+
+class _ElidedButton(QtWidgets.QPushButton):
+    """Flat left-aligned button whose text is shortened in the middle ("Lace…Close Up") to fit."""
+
+    def __init__(self, text, parent=None):
+        super().__init__(parent)
+        self._full = text
+        self.setSizePolicy(QtWidgets.QSizePolicy.Ignored, QtWidgets.QSizePolicy.Preferred)
+        self._elide()
+
+    def minimumSizeHint(self):
+        return QtCore.QSize(0, super().minimumSizeHint().height())
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._elide()
+
+    def _elide(self):
+        width = max(self.width(), 0)
+        shown = self.fontMetrics().elidedText(self._full, QtCore.Qt.ElideMiddle, width) if width else self._full
+        if shown != self.text():
+            self.setText(shown)
 
 
 def _make_remove_btn():
@@ -1026,20 +1067,22 @@ class _ColorRow(QtWidgets.QWidget):
         self._swatch = _DropTargetSwatch()
         self._swatch.setFixedSize(34, 34)
         self._swatch.setStyleSheet(
-            "QPushButton { border: none; padding: 0; margin: 0; "
+            "QPushButton { border: 1px solid rgba(255,255,255,0.28); padding: 0; margin: 0; "
             "min-width: 34px; max-width: 34px; min-height: 34px; max-height: 34px; }"
+            "QPushButton:hover { border-color: rgba(255,255,255,0.7); }"
         )
         self._swatch.setCursor(QtCore.Qt.PointingHandCursor)
         many = len(entries) > 1
         self._swatch.setToolTip(
             ("Click to change color for all layers of the group" if many else "Click to change color")
-            + " — drag a swatch here to apply it"
+            + " — drag a swatch here to apply it (Ctrl: full color, keeps brightness)"
         )
         self._update_swatch(self.color())
         self._swatch.clicked.connect(self._pick_color)
         # only the "Applied colors" strip can be dropped here: it has its own mode
         self._swatch.color_dropped.connect(
-            lambda c: self._apply_new_color(c, add_to_history=False, mode=self._drop_mode_fn())
+            lambda c, full: self._apply_new_color(
+                c, add_to_history=False, mode=False if full else self._drop_mode_fn())
         )
         layout.addWidget(self._swatch)
 
@@ -1056,7 +1099,7 @@ class _ColorRow(QtWidgets.QWidget):
             label = ", ".join(names)
         else:
             label = f"{names[0]} (+{len(names) - 1} more)"
-        name_lbl = QtWidgets.QPushButton(label)
+        name_lbl = _ElidedButton(label)
         name_lbl.setFlat(True)
         name_lbl.setStyleSheet("text-align: left; padding: 0; border: none;")
         name_lbl.setCursor(QtCore.Qt.PointingHandCursor)
@@ -1088,10 +1131,10 @@ class _ColorRow(QtWidgets.QWidget):
         )
 
     def _update_swatch(self, qcolor):
-        pix = QtGui.QPixmap(32, 32)
+        pix = QtGui.QPixmap(30, 30)
         pix.fill(qcolor)
         self._swatch.setIcon(QtGui.QIcon(pix))
-        self._swatch.setIconSize(QtCore.QSize(32, 32))
+        self._swatch.setIconSize(QtCore.QSize(30, 30))
 
     def color(self):
         """Representative color of the group (its first member)."""
@@ -1195,6 +1238,75 @@ class _ColorRow(QtWidgets.QWidget):
             logging.error(f"VG Palette: could not select layers: {e}")
 
 
+class _ScreenPickOverlay(QtWidgets.QWidget):
+    """
+    Full-screen overlay on one monitor showing a frozen screenshot of it, so clicks are
+    captured everywhere (inside or outside Painter). Left-click picks, right-click / Esc exits.
+    """
+
+    picked = QtCore.Signal(QtGui.QColor)
+    finished = QtCore.Signal()
+
+    def __init__(self, screen, shared_colors):
+        super().__init__(None, QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint
+                         | QtCore.Qt.Tool)
+        self._shared = shared_colors          # list shared by all overlays, for the chip row
+        self._image = screen.grabWindow(0).toImage()
+        self._dpr = self._image.devicePixelRatio() or 1.0
+        self.setGeometry(screen.geometry())
+        self.setCursor(QtCore.Qt.CrossCursor)
+        self.setMouseTracking(True)
+        self._hover = None
+
+    def paintEvent(self, _event):
+        p = QtGui.QPainter(self)
+        p.drawImage(self.rect(), self._image)
+        font = p.font()
+        font.setPointSize(10)
+        p.setFont(font)
+        text = "Left-click: add color   ·   Right-click / Esc: exit"
+        fm = p.fontMetrics()
+        bar = QtCore.QRect(12, 12, fm.horizontalAdvance(text) + 24, 28)
+        p.setPen(QtCore.Qt.NoPen)
+        p.setBrush(QtGui.QColor(0, 0, 0, 200))
+        p.drawRoundedRect(bar, 6, 6)
+        p.setPen(QtGui.QColor("#FFFFFF"))
+        p.drawText(bar, QtCore.Qt.AlignCenter, text)
+        x = 12
+        for c in self._shared[-24:]:
+            p.setPen(QtGui.QColor(0, 0, 0, 220))
+            p.setBrush(c)
+            p.drawRect(x, 48, 22, 22)
+            x += 26
+        if self._hover is not None:
+            p.setPen(QtGui.QColor(0, 0, 0, 220))
+            p.setBrush(self._hover[1])
+            p.drawRect(self._hover[0].x() + 16, self._hover[0].y() + 16, 24, 24)
+
+    def _color_at(self, pos):
+        x = min(max(int(pos.x() * self._dpr), 0), self._image.width() - 1)
+        y = min(max(int(pos.y() * self._dpr), 0), self._image.height() - 1)
+        return self._image.pixelColor(x, y)
+
+    def mouseMoveEvent(self, e):
+        pos = e.position().toPoint()
+        self._hover = (pos, self._color_at(pos))
+        self.update()
+
+    def mousePressEvent(self, e):
+        if e.button() == QtCore.Qt.LeftButton:
+            c = self._color_at(e.position().toPoint())
+            self._shared.append(c)
+            self.picked.emit(c)
+            self.update()
+        elif e.button() == QtCore.Qt.RightButton:
+            self.finished.emit()
+
+    def keyPressEvent(self, e):
+        if e.key() == QtCore.Qt.Key_Escape:
+            self.finished.emit()
+
+
 class _WideCombo(QtWidgets.QComboBox):
     """Combo box whose popup list is at least as wide as its longest item."""
 
@@ -1211,6 +1323,8 @@ class PalettePanel(QtWidgets.QWidget):
         self.setMinimumWidth(280)
 
         self._project_was_open = None
+        self._pick_overlays = []
+        self._picking_swatches = False  # eyedropper mode feeding the Applied colors strip
         self._picker_mode = _MODE_HUE   # remembered between color picker sessions
         self._connect_events()
 
@@ -1261,7 +1375,7 @@ class PalettePanel(QtWidgets.QWidget):
         snap_row.setSpacing(6)
         self._snap_combo = _WideCombo()
         self._snap_combo.setFixedHeight(32)
-        self._snap_combo.setMinimumWidth(40)
+        self._snap_combo.setMinimumWidth(110)
         self._snap_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.AdjustToMinimumContentsLengthWithIcon)
         self._snap_combo.setToolTip(
             "Snapshots of every Base Color in every Texture Set, stored in the project file.\n"
@@ -1270,7 +1384,7 @@ class PalettePanel(QtWidgets.QWidget):
         snap_row.addWidget(self._snap_combo, 1)
         for kind, variant, tip, slot in (
             ("add", "secondary", "Save as…\nSave the current colors of all Texture Sets as a named snapshot", self._on_snapshot_save),
-            ("restore", "accent", "Restore\nRestore the selected snapshot (current state is kept as an auto backup)", self._on_snapshot_restore),
+            ("restore", "secondary", "Restore\nRestore the selected snapshot (current state is kept as an auto backup)", self._on_snapshot_restore),
             ("delete", "quiet", "Delete\nDelete the selected snapshot", self._on_snapshot_delete),
         ):
             btn = _spectrum_icon_button(kind, variant, tip)
@@ -1343,6 +1457,25 @@ class PalettePanel(QtWidgets.QWidget):
             self._group_timer.start()
         self._merge_cb.stateChanged.connect(_on_group_toggled)
 
+        # Group / Ungroup act on the checked rows; kept right above the list so they stay
+        # next to the rows however tall the panel is.
+        self._forced = []  # list of sets of entry keys the user grouped by hand
+        force_row = QtWidgets.QHBoxLayout()
+        force_row.setSpacing(6)
+        group_btn = _spectrum_button(
+            "Group selected", "secondary",
+            "Merge the checked rows into one group, whatever their colors.\n"
+            "Kept until the panel is closed.")
+        group_btn.clicked.connect(self._group_checked)
+        ungroup_btn = _spectrum_button(
+            "Ungroup", "secondary",
+            "Undo the manual grouping of the checked rows.\n"
+            "Automatic grouping (Similarity) is not affected.")
+        ungroup_btn.clicked.connect(self._ungroup_checked)
+        force_row.addWidget(group_btn, 1)
+        force_row.addWidget(ungroup_btn, 1)
+        root.addLayout(force_row)
+
         self._scroll = QtWidgets.QScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
@@ -1354,25 +1487,7 @@ class PalettePanel(QtWidgets.QWidget):
         self._rows_layout.setContentsMargins(0, 0, 0, 0)
         self._rows_layout.addStretch()
         self._scroll.setWidget(self._container)
-        root.addWidget(self._scroll, 1)
-
-        # Acts on the checked rows, so it sits right under the list.
-        self._forced = []  # list of sets of entry keys the user grouped by hand
-        force_row = QtWidgets.QHBoxLayout()
-        force_row.setSpacing(6)
-        group_btn = _spectrum_button(
-            "Group selected", "secondary",
-            "Merge the checked rows into one group, whatever their colors.\n"
-            "Kept until the panel is closed.")
-        group_btn.clicked.connect(self._group_checked)
-        ungroup_btn = _spectrum_button(
-            "Ungroup", "quiet",
-            "Undo the manual grouping of the checked rows.\n"
-            "Automatic grouping (Similarity) is not affected.")
-        ungroup_btn.clicked.connect(self._ungroup_checked)
-        force_row.addWidget(group_btn, 1)
-        force_row.addWidget(ungroup_btn, 1)
-        root.addLayout(force_row)
+        root.addWidget(self._scroll, 3)
 
         # ── 3. Applied colors: dropping or clicking one applies hue + saturation ──
         swatch_header = QtWidgets.QHBoxLayout()
@@ -1383,24 +1498,41 @@ class PalettePanel(QtWidgets.QWidget):
         swatch_line.setFrameShadow(QtWidgets.QFrame.Sunken)
         swatch_header.addWidget(swatch_lbl)
         swatch_header.addWidget(swatch_line, 1)
-        clear_btn = _spectrum_button("Clear", "quiet", "Clear color history")
-        clear_btn.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        self._pick_btn = _spectrum_icon_button(
+            "eyedropper", "secondary",
+            "Eyedropper: click anywhere on screen (e.g. on a reference image) to add\n"
+            "colors to this strip. Esc or right-click to stop.")
+        self._pick_btn.clicked.connect(self._start_swatch_picking)
+        swatch_header.addWidget(self._pick_btn)
+        clear_btn = _spectrum_icon_button("delete", "secondary", "Clear the applied colors strip")
         clear_btn.clicked.connect(self._clear_swatches)
         swatch_header.addWidget(clear_btn)
         root.addLayout(swatch_header)
 
-        swatch_scroll = QtWidgets.QScrollArea()
-        swatch_scroll.setWidgetResizable(True)
-        swatch_scroll.setMaximumHeight(90)
-        swatch_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
-        swatch_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        swatch_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+        # Empty-state hint, replaced by the strip as soon as a color is added.
+        self._swatch_placeholder = QtWidgets.QLabel(
+            "No colors yet. Use the eyedropper to pick some,\n"
+            "or change a color above: it lands here.")
+        self._swatch_placeholder.setAlignment(QtCore.Qt.AlignCenter)
+        self._swatch_placeholder.setMinimumHeight(56)
+        self._swatch_placeholder.setStyleSheet(
+            "color: #777; font-size: 11px; border: 1px dashed #4B4B4B; border-radius: 6px;")
+        root.addWidget(self._swatch_placeholder)
+
+        self._swatch_scroll = QtWidgets.QScrollArea()
+        self._swatch_scroll.setWidgetResizable(True)
+        self._swatch_scroll.setMinimumHeight(56)
+        self._swatch_scroll.setMaximumHeight(140)
+        self._swatch_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self._swatch_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self._swatch_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
         self._swatch_container = QtWidgets.QWidget()
         self._swatch_layout = _FlowLayout(self._swatch_container, spacing=4)
         self._swatch_container.setLayout(self._swatch_layout)
-        swatch_scroll.setWidget(self._swatch_container)
-        root.addWidget(swatch_scroll)
+        self._swatch_scroll.setWidget(self._swatch_container)
+        self._swatch_scroll.hide()
+        root.addWidget(self._swatch_scroll)
 
         # ── 4. Relative adjustment of the checked rows ───────────────────────
         section("Adjust (relative)")
@@ -1422,7 +1554,7 @@ class PalettePanel(QtWidgets.QWidget):
         self._scope_lbl.setStyleSheet("color: #888; font-size: 11px;")
         root.addWidget(self._scope_lbl)
 
-        adjust_btns = QtWidgets.QHBoxLayout()
+        adjust_btns = QtWidgets.QGridLayout()
         adjust_btns.setSpacing(6)
         self._compare_btn = _spectrum_button(
             "Compare", "secondary",
@@ -1431,13 +1563,20 @@ class PalettePanel(QtWidgets.QWidget):
         self._compare_btn.pressed.connect(self._compare_show_original)
         self._compare_btn.released.connect(self._compare_show_adjusted)
         reset_btn = _spectrum_button(
-            "Reset", "quiet", "Put the colors back as they were before this adjustment")
+            "Reset", "secondary", "Put the colors back as they were before this adjustment")
         reset_btn.clicked.connect(self._reset_offset)
         commit_btn = _spectrum_button(
             "Apply", "accent", "Keep the adjusted colors and reset the sliders to 0")
         commit_btn.clicked.connect(self._commit_offset)
+        # Compare on its own full-width row; Reset / Apply share the row below.
+        # Minimum widths follow the text so the buttons can never overlap.
         for b in (self._compare_btn, reset_btn, commit_btn):
-            adjust_btns.addWidget(b, 1)
+            b.setMinimumWidth(b.sizeHint().width())
+        adjust_btns.addWidget(self._compare_btn, 0, 0, 1, 2)
+        adjust_btns.addWidget(reset_btn, 1, 0)
+        adjust_btns.addWidget(commit_btn, 1, 1)
+        adjust_btns.setColumnStretch(0, 1)
+        adjust_btns.setColumnStretch(1, 1)
         root.addLayout(adjust_btns)
 
         self.refresh()
@@ -1644,8 +1783,38 @@ class PalettePanel(QtWidgets.QWidget):
         except Exception:
             pass
 
+    # ── Eyedropper feeding the Applied colors strip ──────────────────────────
+
+    def _start_swatch_picking(self):
+        """Left-click anywhere on screen adds that pixel's color; Esc or right-click exits."""
+        if self._picking_swatches:
+            return
+        self._picking_swatches = True
+        self._pick_colors = []
+        self._pick_overlays = []
+        for screen in QtGui.QGuiApplication.screens():
+            ov = _ScreenPickOverlay(screen, self._pick_colors)
+            ov.picked.connect(lambda c: self._add_to_swatches(c, "Picked"))
+            ov.finished.connect(self._stop_swatch_picking)
+            self._pick_overlays.append(ov)
+        for ov in self._pick_overlays:
+            ov.show()
+        if self._pick_overlays:
+            self._pick_overlays[0].activateWindow()
+            self._pick_overlays[0].setFocus()
+
+    def _stop_swatch_picking(self):
+        if not self._picking_swatches:
+            return
+        self._picking_swatches = False
+        for ov in self._pick_overlays:
+            ov.hide()
+            ov.deleteLater()
+        self._pick_overlays = []
+
     def cleanup(self):
         """Stop the poll timer and disconnect Painter events. Safe to call multiple times."""
+        self._stop_swatch_picking()
         self._poll_timer.stop()
         self._disconnect_events()
 
@@ -1807,12 +1976,19 @@ class PalettePanel(QtWidgets.QWidget):
         pix.fill(qcolor)
         btn.setIcon(QtGui.QIcon(pix))
         btn.setIconSize(QtCore.QSize(24, 24))
+        self._swatch_placeholder.hide()
+        self._swatch_scroll.show()
         btn.setStyleSheet(
-            "QPushButton { border: none; padding: 0; margin: 0; "
+            "QPushButton { border: 1px solid rgba(255,255,255,0.28); padding: 0; margin: 0; "
             "min-width: 26px; max-width: 26px; min-height: 26px; max-height: 26px; }"
+            "QPushButton:hover { border-color: rgba(255,255,255,0.7); }"
         )
-        btn.setToolTip(f"{layer_name}\n{qcolor.name().upper()}\nClick to apply to selection — drag to a row swatch")
-        btn.clicked.connect(lambda: self._apply_swatch_to_selection(qcolor))
+        btn.setToolTip(
+            f"{layer_name}\n{qcolor.name().upper()}\n"
+            "Click to apply to selection — drag to a row swatch\n"
+            "Hold Ctrl to apply the full color (keeps brightness too)")
+        btn.clicked.connect(lambda: self._apply_swatch_to_selection(
+            qcolor, bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)))
         self._swatch_layout.addWidget(btn)
         self._swatch_container.updateGeometry()
 
@@ -1822,12 +1998,14 @@ class PalettePanel(QtWidgets.QWidget):
             w = item.widget()
             if w:
                 w.deleteLater()
+        self._swatch_scroll.hide()
+        self._swatch_placeholder.show()
 
-    def _apply_swatch_to_selection(self, qcolor):
+    def _apply_swatch_to_selection(self, qcolor, full=False):
         if not project.is_open():
             return
         stack = textureset.get_active_stack()
-        hue_only = self._drop_mode()
+        hue_only = False if full else self._drop_mode()
         for node in layerstack.get_selected_nodes(stack):
             if node.get_type() != layerstack.NodeType.FillLayer:
                 continue

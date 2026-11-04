@@ -136,7 +136,8 @@ Applies a collection's Smart Material to **every Texture Set in every `.spp` pro
 - **Click a color swatch** to open a color picker and apply the new color to the layer instantly.
 - **Click a layer name** to select that layer in the stack.
 - **Drag a color** from the Applied Colors strip at the bottom onto any row swatch to apply it directly.
-- **Applied Colors strip** — records every color change made in the session. Click a swatch to apply it to the currently selected fill layer(s) in the stack.
+- **Applied Colors strip** — records every color change made in the session. Click a swatch to apply it to the currently selected fill layer(s) in the stack. By default only hue + saturation are applied (each layer keeps its brightness); hold **Ctrl** while clicking or dropping to apply the **full color**, brightness included (useful for black or very dark colors).
+- **Pick (eyedropper)** — button in the Applied Colors header. The screen is frozen as a screenshot (all monitors, including other apps); click anywhere on it (e.g. on a reference image) to add each sampled color to the strip, and keep clicking to add more. **Esc** or **right-click** exits the mode.
 - **Ignore hidden layers** *(checked by default)* — skips layers that are not visible.
 - **Group colors** — collapses layers that share the same color into a single row, so editing one updates all layers in the group simultaneously. The list covers **every Texture Set**.
 - **Similarity** — slider that also groups *similar* colors (perceptual distance, ΔE). At 0 only identical colors are grouped. Each layer in a group keeps its own color differences when a hue mode is used.
