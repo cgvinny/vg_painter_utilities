@@ -1392,6 +1392,14 @@ class PalettePanel(QtWidgets.QWidget):
             snap_row.addWidget(btn)
         root.addLayout(snap_row)
 
+        self._bake_btn = _spectrum_button(
+            "Bake to layer", "secondary",
+            "Bake the resulting Base Color of every Texture Set into a fill layer\n"
+            "at the very top of the stack, named after the selected snapshot.\n"
+            "The new layer is created disabled (hidden).")
+        self._bake_btn.clicked.connect(self._on_bake_to_layer)
+        root.addWidget(self._bake_btn)
+
         self._snap_status = QtWidgets.QLabel("")
         self._snap_status.setWordWrap(True)
         self._snap_status.setStyleSheet("color: #888; font-size: 11px;")
@@ -1759,6 +1767,28 @@ class PalettePanel(QtWidgets.QWidget):
             msg += f", {missing} layers not found"
         self._snap_status.setText(msg + ".")
         self._refresh_snapshots(select=name)
+        self.refresh()
+
+    def _on_bake_to_layer(self):
+        if not project.is_open():
+            return
+        name = self._snap_combo.currentText() or "Base Color Bake"
+        try:
+            from vg_pt_utils import vg_export
+            count = vg_export.bake_base_color_to_layer(name)
+        except Exception as e:
+            logging.error(f"VG Palette: bake to layer failed: {e}")
+            self._snap_status.setText("Bake failed — see the log.")
+            return
+        total = len(textureset.all_texture_sets())
+        if not count:
+            self._snap_status.setText("Nothing was baked — see the log.")
+        elif count < total:
+            self._snap_status.setText(
+                f"Baked '{name}' into {count} of {total} Texture Sets — "
+                f"{total - count} skipped or failed, see the log.")
+        else:
+            self._snap_status.setText(f"Baked '{name}' into all {total} Texture Sets.")
         self.refresh()
 
     def _on_snapshot_delete(self):

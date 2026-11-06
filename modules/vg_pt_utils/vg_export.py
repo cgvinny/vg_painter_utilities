@@ -291,6 +291,59 @@ def _apply_textures_to_new_layer(stack_manager, exported_textures):
     TextureAssignmentManager().import_and_assign_textures(new_layer, exported_textures)
 
 
+def bake_base_color_to_layer(layer_name):
+    """
+    Export the visible Base Color of every texture set and import it as a fill layer
+    named *layer_name* on top of each stack (only the BaseColor channel is active).
+
+    The previously active stack is restored afterwards.
+    Returns the number of texture sets baked.
+    """
+    if not project.is_open():
+        return 0
+
+    previous_stack = textureset.get_active_stack()
+    baked = 0
+    try:
+        for ts in textureset.all_texture_sets():
+            stack = ts.get_stack()
+            try:
+                textureset.set_active_stack(stack)
+                ts_info = vg_project_info.TextureSetInfo(stack).get_info()
+                if "BaseColor" not in [ch.name for ch in ts_info.channels]:
+                    continue
+
+                config = _build_id_map_export_config(ts_info)
+                config["defaultExportPreset"] = "Base Color Bake"
+                preset = config["exportPresets"][0]
+                preset["name"] = "Base Color Bake"
+                udim_suffix = '.$udim' if ts.has_uv_tiles() else ''
+                preset["maps"][0]["fileName"] = f"$mesh_$textureSet_BaseColor{udim_suffix}"
+
+                result = TextureExporter().export_textures(config)
+                if not result:
+                    continue
+
+                new_layer = vg_layerstack.LayerManager().add_layer(
+                    "fill", layer_position="On Top", layer_name=layer_name,
+                    active_channels=["BaseColor"],
+                )
+                if new_layer is None:
+                    continue
+                new_layer.set_blending_mode(BLENDING_NORMAL, layerstack.ChannelType.BaseColor)
+                TextureAssignmentManager().import_and_assign_textures(new_layer, result)
+                new_layer.set_visible(False)  # baked copy is kept off so it doesn't alter the stack
+                baked += 1
+            except Exception as e:
+                logging.error(f"VG Export: base color bake failed on '{ts.name}': {e}")
+    finally:
+        try:
+            textureset.set_active_stack(previous_stack)
+        except Exception:
+            pass
+    return baked
+
+
 def create_layer_from_stack():
     """Export the visible stack content and import it as a new fill layer on top."""
     export_config = ExportConfigGenerator(export.get_default_export_path()).generate_export_config()
