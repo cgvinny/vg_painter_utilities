@@ -291,6 +291,90 @@ def _apply_textures_to_new_layer(stack_manager, exported_textures):
     TextureAssignmentManager().import_and_assign_textures(new_layer, exported_textures)
 
 
+_BAKE_META_CONTEXT = "vg_base_color_manager"
+_BAKE_META_KEY = "baked_layers"
+
+
+def _load_baked_records():
+    """Records of the layers created by the bake: [{"uid": int, "name": str}, ...]."""
+    try:
+        meta = project.Metadata(_BAKE_META_CONTEXT)
+        if _BAKE_META_KEY not in meta.list():
+            return []
+        return list(meta.get(_BAKE_META_KEY) or [])
+    except Exception as e:
+        logging.warning(f"VG Export: could not read baked layer records: {e}")
+        return []
+
+
+def _store_baked_records(records):
+    try:
+        project.Metadata(_BAKE_META_CONTEXT).set(_BAKE_META_KEY, records)
+    except Exception as e:
+        logging.warning(f"VG Export: could not store baked layer records: {e}")
+
+
+def _resolve_baked_layers():
+    """
+    Return [(node, snapshot_name)] for the baked layers that still exist. A record is only
+    trusted if the node is still a fill layer carrying the recorded name (a uid may be
+    stale or the layer deleted/renamed by the user); stale records are dropped from the
+    project metadata. Records written before the snapshot name was stored fall back to
+    the layer name, which the bake sets to the snapshot name.
+    """
+    if not project.is_open():
+        return []
+    records = _load_baked_records()
+    found, kept = [], []
+    for rec in records:
+        try:
+            node = layerstack.get_node_by_uid(rec["uid"])
+            if node.get_type() != layerstack.NodeType.FillLayer or node.get_name() != rec["name"]:
+                continue
+        except Exception:
+            continue
+        found.append((node, rec.get("snapshot", rec["name"])))
+        kept.append(rec)
+    if len(kept) != len(records):
+        _store_baked_records(kept)
+    return found
+
+
+def are_baked_layers_visible(snapshot):
+    """
+    State of the baked layers of *snapshot*: None if there are none, True if all of them
+    are visible, False otherwise.
+    """
+    nodes = [n for n, snap in _resolve_baked_layers() if snap == snapshot]
+    if not nodes:
+        return None
+    return all(n.is_visible() for n in nodes)
+
+
+def any_baked_layer_visible():
+    """True if at least one baked layer (of any snapshot) is visible."""
+    return any(n.is_visible() for n, _ in _resolve_baked_layers())
+
+
+def show_baked_layers(snapshot):
+    """
+    Make the baked layers of *snapshot* visible and hide every other baked layer, so that
+    at most one snapshot is shown at a time. Pass None to hide them all. Only layers whose
+    state differs are touched; non-baked layers are never touched.
+    Returns the number of layers whose visibility was changed.
+    """
+    changed = 0
+    for node, snap in _resolve_baked_layers():
+        want = snapshot is not None and snap == snapshot
+        try:
+            if node.is_visible() != want:
+                node.set_visible(want)
+                changed += 1
+        except Exception as e:
+            logging.error(f"VG Export: could not change baked layer visibility: {e}")
+    return changed
+
+
 def bake_base_color_to_layer(layer_name):
     """
     Export the visible Base Color of every texture set and import it as a fill layer
@@ -332,7 +416,28 @@ def bake_base_color_to_layer(layer_name):
                     continue
                 new_layer.set_blending_mode(BLENDING_NORMAL, layerstack.ChannelType.BaseColor)
                 TextureAssignmentManager().import_and_assign_textures(new_layer, result)
-                new_layer.set_visible(False)  # baked copy is kept off so it doesn't alter the stack
+                # Re-baking the same snapshot replaces the previous baked layer of this
+                # texture set (deleted only now that the new one exists). The new layer
+                # keeps the old one's visibility; a first bake stays hidden so it doesn't
+                # alter the stack.
+                was_visible = False
+                records = []
+                for rec in _load_baked_records():
+                    if rec.get("snapshot") == layer_name and rec.get("ts") == ts.name:
+                        try:
+                            old = layerstack.get_node_by_uid(rec["uid"])
+                            if (old.get_type() == layerstack.NodeType.FillLayer
+                                    and old.get_name() == rec["name"]):
+                                was_visible = was_visible or old.is_visible()
+                                layerstack.delete_node(old)
+                        except Exception:
+                            pass  # already gone
+                        continue
+                    records.append(rec)
+                new_layer.set_visible(was_visible)
+                records.append({"uid": new_layer.uid(), "name": new_layer.get_name(),
+                                "snapshot": layer_name, "ts": ts.name})
+                _store_baked_records(records)
                 baked += 1
             except Exception as e:
                 logging.error(f"VG Export: base color bake failed on '{ts.name}': {e}")

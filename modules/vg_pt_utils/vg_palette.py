@@ -330,6 +330,28 @@ def delete_snapshot(name):
         _store_snapshots(snapshots)
 
 
+_LAST_RESTORED_KEY = "last_restored"
+
+
+def get_last_restored():
+    """Name of the snapshot restored last in this project, or None."""
+    try:
+        meta = project.Metadata(_META_CONTEXT)
+        if _LAST_RESTORED_KEY not in meta.list():
+            return None
+        return meta.get(_LAST_RESTORED_KEY) or None
+    except Exception as e:
+        logging.warning(f"VG Palette: could not read last restored snapshot: {e}")
+        return None
+
+
+def _set_last_restored(name):
+    try:
+        project.Metadata(_META_CONTEXT).set(_LAST_RESTORED_KEY, name)
+    except Exception as e:
+        logging.warning(f"VG Palette: could not store last restored snapshot: {e}")
+
+
 def ensure_default_snapshot():
     """Create the 'Default' snapshot the first time a project is seen. Returns True if created."""
     if not project.is_open() or load_snapshots() is not None:
@@ -466,6 +488,15 @@ def _draw_icon(kind, color="#FFFFFF", size=16):
         p.drawLine(QtCore.QPointF(7.5, s - 7.5), QtCore.QPointF(s - 6, 6))    # body
         p.setPen(pen)
         p.drawEllipse(QtCore.QPointF(s - 4.5, 4.5), 2.2, 2.2)                  # bulb
+    elif kind in ("eye", "eye_off"):
+        eye = QtGui.QPainterPath()
+        eye.moveTo(1.5, s / 2)
+        eye.quadTo(s / 2, s * 0.05, s - 1.5, s / 2)
+        eye.quadTo(s / 2, s * 0.95, 1.5, s / 2)
+        p.drawPath(eye)
+        p.drawEllipse(QtCore.QPointF(s / 2, s / 2), 2.2, 2.2)
+        if kind == "eye_off":
+            p.drawLine(QtCore.QPointF(3, s - 3), QtCore.QPointF(s - 3, 3))
     elif kind == "delete":
         p.drawLine(QtCore.QPointF(3, 4.5), QtCore.QPointF(s - 3, 4.5))        # lid
         p.drawLine(QtCore.QPointF(6, 4.5), QtCore.QPointF(6, 2.5))
@@ -1396,9 +1427,18 @@ class PalettePanel(QtWidgets.QWidget):
             "Bake to layer", "secondary",
             "Bake the resulting Base Color of every Texture Set into a fill layer\n"
             "at the very top of the stack, named after the selected snapshot.\n"
-            "The new layer is created disabled (hidden).")
+            "The new layer is created disabled (hidden). Baking the same snapshot again\n"
+            "replaces its previous baked layer.")
         self._bake_btn.clicked.connect(self._on_bake_to_layer)
-        root.addWidget(self._bake_btn)
+
+        self._bake_vis_btn = _spectrum_icon_button("eye_off", "secondary", "")
+        self._bake_vis_btn.clicked.connect(self._on_toggle_baked_visibility)
+
+        bake_row = QtWidgets.QHBoxLayout()
+        bake_row.setSpacing(6)
+        bake_row.addWidget(self._bake_btn, 1)
+        bake_row.addWidget(self._bake_vis_btn)
+        root.addLayout(bake_row)
 
         self._snap_status = QtWidgets.QLabel("")
         self._snap_status.setWordWrap(True)
@@ -1758,7 +1798,14 @@ class PalettePanel(QtWidgets.QWidget):
         try:
             if name != BACKUP_SNAPSHOT:
                 save_snapshot(BACKUP_SNAPSHOT)
+            # Baked layers follow the restore: if any is shown, show the ones of the
+            # restored snapshot instead (a snapshot without baked layer hides them all).
+            from vg_pt_utils import vg_export
+            follow = vg_export.any_baked_layer_visible()
             restored, missing = restore_snapshot(name)
+            _set_last_restored(name)
+            if follow:
+                vg_export.show_baked_layers(name)
         except Exception as e:
             logging.error(f"VG Palette: could not restore snapshot: {e}")
             return
@@ -1790,6 +1837,56 @@ class PalettePanel(QtWidgets.QWidget):
         else:
             self._snap_status.setText(f"Baked '{name}' into all {total} Texture Sets.")
         self.refresh()
+
+    def _update_bake_visibility_btn(self):
+        """Sync the eye button with the real visibility of the baked layers."""
+        state = None
+        ref = self._reference_snapshot()
+        if project.is_open() and ref:
+            try:
+                from vg_pt_utils import vg_export
+                state = vg_export.are_baked_layers_visible(ref)
+            except Exception as e:
+                logging.warning(f"VG Palette: could not read baked layer state: {e}")
+        btn = self._bake_vis_btn
+        btn.setEnabled(state is not None)
+        btn.setIcon(_draw_icon("eye" if state else "eye_off",
+                               "#E3E3E3" if state is not None else "#6D6D6D"))
+        if state is None:
+            btn.setToolTip(f"Baked layer\nNo baked layer for '{ref}' in this project" if ref
+                           else "Baked layer\nNo snapshot yet")
+        elif state:
+            btn.setToolTip(f"Baked layer '{ref}' is visible\nClick to hide the baked layers in every Texture Set")
+        else:
+            btn.setToolTip(f"Baked layer '{ref}' is hidden\nClick to show it in every Texture Set")
+
+    def _reference_snapshot(self):
+        """Last restored snapshot (if it still exists), else the one selected in the list."""
+        if not project.is_open():
+            return None
+        last = get_last_restored()
+        if last and last in (load_snapshots() or {}):
+            return last
+        return self._snap_combo.currentText() or None
+
+    def _on_toggle_baked_visibility(self):
+        if not project.is_open():
+            return
+        try:
+            from vg_pt_utils import vg_export
+            ref = self._reference_snapshot()
+            state = vg_export.are_baked_layers_visible(ref) if ref else None
+            if state is None:
+                self._update_bake_visibility_btn()
+                return
+            # all visible -> hide every baked layer; otherwise show the reference snapshot's
+            # layers and hide the other snapshots' ones. Layers already in the target
+            # state are left untouched.
+            vg_export.show_baked_layers(None if state else ref)
+        except Exception as e:
+            logging.error(f"VG Palette: toggling baked layers failed: {e}")
+            self._snap_status.setText("Could not toggle the baked layers — see the log.")
+        self._update_bake_visibility_btn()
 
     def _on_snapshot_delete(self):
         name = self._snap_combo.currentText()
@@ -1874,6 +1971,7 @@ class PalettePanel(QtWidgets.QWidget):
         self._clear_rows()
 
         self._project_was_open = project.is_open()
+        self._update_bake_visibility_btn()
         if not self._project_was_open:
             self._refresh_snapshots()
             self._update_scope_label()
