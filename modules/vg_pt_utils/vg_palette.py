@@ -272,6 +272,7 @@ _META_CONTEXT = "vg_base_color_manager"
 _META_KEY = "snapshots"
 DEFAULT_SNAPSHOT = "Default"
 BACKUP_SNAPSHOT = "Before restore (auto)"
+PALETTE_BACKUP_SNAPSHOT = "Before palette (auto)"
 
 
 def _node_uid(node):
@@ -328,6 +329,35 @@ def delete_snapshot(name):
     snapshots = load_snapshots() or {}
     if snapshots.pop(name, None) is not None:
         _store_snapshots(snapshots)
+
+
+_APPLIED_COLORS_KEY = "applied_colors"
+
+
+def load_applied_colors():
+    """Return the project's saved Applied colors as [(QColor, name)] (empty if none)."""
+    try:
+        meta = project.Metadata(_META_CONTEXT)
+        if _APPLIED_COLORS_KEY not in meta.list():
+            return []
+        out = []
+        for item in meta.get(_APPLIED_COLORS_KEY) or []:
+            color = QtGui.QColor(item.get("hex", ""))
+            if color.isValid():
+                out.append((color, item.get("name", "")))
+        return out
+    except Exception as e:
+        logging.warning(f"VG Palette: could not read applied colors: {e}")
+        return []
+
+
+def save_applied_colors(items):
+    """Store [(QColor, name)] in the project (written to the file when the project is saved)."""
+    try:
+        project.Metadata(_META_CONTEXT).set(
+            _APPLIED_COLORS_KEY, [{"hex": c.name(), "name": n} for c, n in items])
+    except Exception as e:
+        logging.warning(f"VG Palette: could not store applied colors: {e}")
 
 
 _LAST_RESTORED_KEY = "last_restored"
@@ -497,6 +527,28 @@ def _draw_icon(kind, color="#FFFFFF", size=16):
         p.drawEllipse(QtCore.QPointF(s / 2, s / 2), 2.2, 2.2)
         if kind == "eye_off":
             p.drawLine(QtCore.QPointF(3, s - 3), QtCore.QPointF(s - 3, 3))
+    elif kind == "unlink":
+        p.translate(s / 2, s / 2)
+        p.rotate(-45)
+        p.drawRoundedRect(QtCore.QRectF(-s * 0.46, -s * 0.16, s * 0.42, s * 0.32), s * 0.16, s * 0.16)
+        p.drawRoundedRect(QtCore.QRectF(s * 0.04, -s * 0.16, s * 0.42, s * 0.32), s * 0.16, s * 0.16)
+    elif kind == "options":
+        for y, knob in ((4.5, s * 0.62), (s / 2, s * 0.34), (s - 4.5, s * 0.55)):   # three sliders
+            p.drawLine(QtCore.QPointF(2.5, y), QtCore.QPointF(s - 2.5, y))
+            p.setBrush(QtGui.QColor("#1D1D1D"))
+            p.drawEllipse(QtCore.QPointF(knob, y), 2.0, 2.0)
+            p.setBrush(QtCore.Qt.NoBrush)
+    elif kind == "import":
+        p.drawLine(QtCore.QPointF(s / 2, 2.5), QtCore.QPointF(s / 2, s - 6))      # arrow shaft
+        p.drawLine(QtCore.QPointF(s / 2, s - 6), QtCore.QPointF(s / 2 - 3, s - 9))
+        p.drawLine(QtCore.QPointF(s / 2, s - 6), QtCore.QPointF(s / 2 + 3, s - 9))
+        p.drawLine(QtCore.QPointF(3, s - 3), QtCore.QPointF(s - 3, s - 3))        # tray
+    elif kind == "grip":
+        p.setPen(QtCore.Qt.NoPen)
+        p.setBrush(QtGui.QColor(color))
+        for cx in (s / 2 - 2.5, s / 2 + 2.5):
+            for cy in (s / 2 - 4, s / 2, s / 2 + 4):
+                p.drawEllipse(QtCore.QPointF(cx, cy), 1.1, 1.1)
     elif kind == "delete":
         p.drawLine(QtCore.QPointF(3, 4.5), QtCore.QPointF(s - 3, 4.5))        # lid
         p.drawLine(QtCore.QPointF(6, 4.5), QtCore.QPointF(6, 2.5))
@@ -523,13 +575,218 @@ def _spectrum_icon_button(kind, variant, tooltip):
     return btn
 
 
+_SPECTRUM_SLIDER_ID = "vgSpectrumSlider"
+
+# Spectrum dark theme slider: thin neutral track, round 16px handle with a 2px ring.
+_SPECTRUM_SLIDER_QSS = (
+    "QSlider#{i} {{ min-height: 24px; max-height: 24px; }}"
+    "QSlider#{i}::groove:horizontal {{ height: 4px; background: #4B4B4B; border-radius: 2px; }}"
+    "{fill}"
+    "QSlider#{i}::handle:horizontal {{ width: 12px; height: 12px; margin: -6px 0; "
+    "border-radius: 8px; border: 2px solid #E3E3E3; background: #1D1D1D; }}"
+    "QSlider#{i}::handle:horizontal:hover {{ border-color: #FFFFFF; background: #2C2C2C; }}"
+    "QSlider#{i}::handle:horizontal:pressed {{ border-color: #3B63FB; }}"
+    "QSlider#{i}::handle:horizontal:disabled {{ border-color: #4B4B4B; background: #1D1D1D; }}"
+)
+_SPECTRUM_SLIDER_FILL = (
+    "QSlider#{i}::sub-page:horizontal {{ height: 4px; background: #8F8F8F; border-radius: 2px; }}"
+    "QSlider#{i}::sub-page:horizontal:disabled {{ background: #4B4B4B; }}"
+)
+
+
+def _spectrum_slider(minimum, maximum, value, tooltip="", filled=True):
+    """
+    Horizontal slider styled after Adobe Spectrum. *filled* paints the track up to the
+    handle (for 0-based sliders); centered/bipolar sliders keep a plain track.
+    """
+    slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
+    slider.setObjectName(_SPECTRUM_SLIDER_ID)
+    slider.setRange(minimum, maximum)
+    slider.setValue(value)
+    slider.setCursor(QtCore.Qt.PointingHandCursor)
+    slider.setStyleSheet(_SPECTRUM_SLIDER_QSS.format(
+        i=_SPECTRUM_SLIDER_ID, fill=_SPECTRUM_SLIDER_FILL.format(i=_SPECTRUM_SLIDER_ID) if filled else ""))
+    if tooltip:
+        slider.setToolTip(tooltip)
+    return slider
+
+
+_MUTED_LABEL_QSS = "color: #B1B1B1; font-size: 11px;"
+
+
+def _slider_block(label, slider, value_label=None, end_labels=None):
+    """
+    Spectrum layout: label on top (value right-aligned on the same line),
+    full-width slider below, optional min/max captions under the track.
+    """
+    box = QtWidgets.QVBoxLayout()
+    box.setSpacing(0)
+    box.setContentsMargins(0, 0, 0, 0)
+    top = QtWidgets.QHBoxLayout()
+    lbl = QtWidgets.QLabel(label)
+    lbl.setStyleSheet("color: #E3E3E3;")
+    top.addWidget(lbl)
+    top.addStretch()
+    if value_label is not None:
+        value_label.setStyleSheet(_MUTED_LABEL_QSS)
+        value_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
+        top.addWidget(value_label)
+    box.addLayout(top)
+    box.addWidget(slider)
+    if end_labels:
+        bottom = QtWidgets.QHBoxLayout()
+        left, right = (QtWidgets.QLabel(t) for t in end_labels)
+        for w in (left, right):
+            w.setStyleSheet(_MUTED_LABEL_QSS)
+        bottom.addWidget(left)
+        bottom.addStretch()
+        bottom.addWidget(right)
+        box.addLayout(bottom)
+    return box
+
+
+_ROW_MIME_TYPE = "application/x-vg-palette-row"
+
+
+class _RowGrip(QtWidgets.QLabel):
+    """Drag handle at the left of a color row; dragging it reorders the row."""
+    drag_started = QtCore.Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setPixmap(_draw_icon("grip", "#8F8F8F", 16).pixmap(16, 16))
+        self.setFixedWidth(14)
+        self.setCursor(QtCore.Qt.OpenHandCursor)
+        self.setToolTip("Drag to reorder")
+        self._press = None
+
+    def mousePressEvent(self, e):
+        if e.button() == QtCore.Qt.LeftButton:
+            self._press = e.pos()
+
+    def mouseMoveEvent(self, e):
+        if (e.buttons() & QtCore.Qt.LeftButton and self._press is not None
+                and (e.pos() - self._press).manhattanLength() > QtWidgets.QApplication.startDragDistance()):
+            self._press = None
+            self.drag_started.emit()
+
+    def mouseReleaseEvent(self, e):
+        self._press = None
+
+
+_SWATCH_MIME_TYPE = "application/x-vg-palette-swatch"
+
+
+class _SwatchStrip(QtWidgets.QWidget):
+    """
+    Container of the Applied colors swatches (laid out by a _FlowLayout). Accepts a swatch
+    dragged from the strip itself and emits swatch_moved(from_index, to_index), where
+    to_index is the position among the other swatches.
+    """
+    swatch_moved = QtCore.Signal(int, int)
+    background_clicked = QtCore.Signal()   # click on the empty part of the strip
+
+    def mousePressEvent(self, e):
+        if e.button() == QtCore.Qt.LeftButton:
+            self.background_clicked.emit()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        # Qt hands a drag to the nearest widget that accepts drops, so anything that is not a
+        # swatch of this strip (.ase file, row color) is relayed to the enclosing drop area.
+        self.fallback = None
+        self._indicator = QtWidgets.QFrame(self)
+        self._indicator.setFixedWidth(2)
+        self._indicator.setStyleSheet("background: #3B63FB; border-radius: 1px;")
+        self._indicator.hide()
+
+    def _swatches(self):
+        lay = self.layout()
+        return [lay.itemAt(i).widget() for i in range(lay.count()) if lay.itemAt(i).widget()]
+
+    def _target(self, event):
+        """(source index, insertion index among the others, indicator rect) or None."""
+        swatches = self._swatches()
+        source = event.source()
+        if source not in swatches:
+            return None
+        others = [s for s in swatches if s is not source]
+        pos = event.position().toPoint()
+        index = len(others)
+        for i, w in enumerate(others):
+            g = w.geometry()
+            if pos.y() < g.top() or (pos.y() <= g.bottom() and pos.x() < g.center().x()):
+                index = i
+                break
+        if not others:
+            rect = QtCore.QRect(0, 0, 2, 26)
+        elif index < len(others):
+            g = others[index].geometry()
+            rect = QtCore.QRect(g.left() - 3, g.top(), 2, g.height())
+        else:
+            g = others[-1].geometry()
+            rect = QtCore.QRect(g.right() + 2, g.top(), 2, g.height())
+        return swatches.index(source), index, rect
+
+    def _foreign(self, event):
+        return self.fallback is not None and not event.mimeData().hasFormat(_SWATCH_MIME_TYPE)
+
+    def dragEnterEvent(self, event):
+        if self._foreign(event):
+            self.fallback.dragEnterEvent(event)
+        elif event.mimeData().hasFormat(_SWATCH_MIME_TYPE) and self._target(event):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if self._foreign(event):
+            self.fallback.dragMoveEvent(event)
+            return
+        target = self._target(event) if event.mimeData().hasFormat(_SWATCH_MIME_TYPE) else None
+        if not target:
+            event.ignore()
+            return
+        self._indicator.setGeometry(target[2])
+        self._indicator.raise_()
+        self._indicator.show()
+        event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        self._indicator.hide()
+        if self.fallback is not None:
+            self.fallback.dragLeaveEvent(event)
+
+    def dropEvent(self, event):
+        self._indicator.hide()
+        if self._foreign(event):
+            self.fallback.dropEvent(event)
+            return
+        target = self._target(event) if event.mimeData().hasFormat(_SWATCH_MIME_TYPE) else None
+        if target:
+            event.acceptProposedAction()
+            self.swatch_moved.emit(target[0], target[1])
+
+
 class _DraggableSwatch(QtWidgets.QPushButton):
-    """Swatch button that initiates a color drag on mouse move."""
+    """
+    Swatch button that initiates a color drag on mouse move. The same drag carries the
+    color (to drop on a row) and a swatch marker (to reorder inside the strip).
+    drag_done fires once the drag is over, so the strip can be rebuilt safely afterwards.
+    """
+    drag_done = QtCore.Signal()
+    double_clicked = QtCore.Signal(bool)   # True when Alt was held
 
     def __init__(self, qcolor, parent=None):
         super().__init__(parent)
         self._color = qcolor
         self._drag_start = None
+
+    def mouseDoubleClickEvent(self, event):
+        super().mouseDoubleClickEvent(event)
+        if event.button() == QtCore.Qt.LeftButton:
+            self.double_clicked.emit(bool(event.modifiers() & QtCore.Qt.AltModifier))
 
     def mousePressEvent(self, event):
         if event.button() == QtCore.Qt.LeftButton:
@@ -544,12 +801,15 @@ class _DraggableSwatch(QtWidgets.QPushButton):
             drag = QtGui.QDrag(self)
             mime = QtCore.QMimeData()
             mime.setData(_COLOR_MIME_TYPE, self._color.name().encode())
+            mime.setData(_SWATCH_MIME_TYPE, b"swatch")
             drag.setMimeData(mime)
             pix = QtGui.QPixmap(24, 24)
             pix.fill(self._color)
             drag.setPixmap(pix)
-            drag.exec(QtCore.Qt.CopyAction)
             self._drag_start = None
+            drag.exec(QtCore.Qt.CopyAction | QtCore.Qt.MoveAction)
+            self.drag_done.emit()
+            return
         super().mouseMoveEvent(event)
 
 
@@ -560,6 +820,31 @@ class _DropTargetSwatch(QtWidgets.QPushButton):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAcceptDrops(True)
+        self.color_fn = None        # returns the color to hand out when this swatch is dragged
+        self._drag_start = None
+
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self._drag_start = event.pos()
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if (self.color_fn and self._drag_start is not None and event.buttons() & QtCore.Qt.LeftButton
+                and (event.pos() - self._drag_start).manhattanLength()
+                    > QtWidgets.QApplication.startDragDistance()):
+            color = self.color_fn()
+            drag = QtGui.QDrag(self)
+            mime = QtCore.QMimeData()
+            mime.setData(_COLOR_MIME_TYPE, color.name().encode())
+            drag.setMimeData(mime)
+            pix = QtGui.QPixmap(24, 24)
+            pix.fill(color)
+            drag.setPixmap(pix)
+            self._drag_start = None
+            drag.exec(QtCore.Qt.CopyAction)
+            self.setDown(False)
+            return
+        super().mouseMoveEvent(event)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat(_COLOR_MIME_TYPE):
@@ -1087,8 +1372,12 @@ class _ColorRow(QtWidgets.QWidget):
         self._get_checked_fn = get_checked_fn or (lambda: [])
 
         layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(4, 3, 4, 3)
+        layout.setContentsMargins(4, 2, 4, 2)
         layout.setSpacing(6)
+
+        self._grip = _RowGrip()
+        self._grip.drag_started.connect(self._start_row_drag)
+        layout.addWidget(self._grip)
 
         self._checkbox = QtWidgets.QCheckBox()
         self._checkbox.setToolTip("Select for batch operations")
@@ -1096,17 +1385,19 @@ class _ColorRow(QtWidgets.QWidget):
         layout.addWidget(self._checkbox)
 
         self._swatch = _DropTargetSwatch()
-        self._swatch.setFixedSize(34, 34)
+        self._swatch.setFixedSize(28, 28)
         self._swatch.setStyleSheet(
             "QPushButton { border: 1px solid rgba(255,255,255,0.28); padding: 0; margin: 0; "
-            "min-width: 34px; max-width: 34px; min-height: 34px; max-height: 34px; }"
+            "min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; }"
             "QPushButton:hover { border-color: rgba(255,255,255,0.7); }"
         )
         self._swatch.setCursor(QtCore.Qt.PointingHandCursor)
+        self._swatch.color_fn = self.color     # drag it onto the Applied colors strip to keep it
         many = len(entries) > 1
         self._swatch.setToolTip(
             ("Click to change color for all layers of the group" if many else "Click to change color")
             + " — drag a swatch here to apply it (Ctrl: full color, keeps brightness)"
+            + "\nDrag this swatch onto the Applied colors strip to add the color to it"
         )
         self._update_swatch(self.color())
         self._swatch.clicked.connect(self._pick_color)
@@ -1156,16 +1447,26 @@ class _ColorRow(QtWidgets.QWidget):
 
         layout.addWidget(self._name_frame, 1)
 
+    def _start_row_drag(self):
+        drag = QtGui.QDrag(self)
+        mime = QtCore.QMimeData()
+        mime.setData(_ROW_MIME_TYPE, b"row")
+        drag.setMimeData(mime)
+        pix = self.grab()
+        drag.setPixmap(pix)
+        drag.setHotSpot(QtCore.QPoint(14, pix.height() // 2))
+        drag.exec(QtCore.Qt.MoveAction)
+
     def _update_frame_style(self, state):
         self._name_frame.setStyleSheet(
             self._FRAME_CHECKED if state else self._FRAME_NORMAL
         )
 
     def _update_swatch(self, qcolor):
-        pix = QtGui.QPixmap(30, 30)
+        pix = QtGui.QPixmap(24, 24)
         pix.fill(qcolor)
         self._swatch.setIcon(QtGui.QIcon(pix))
-        self._swatch.setIconSize(QtCore.QSize(30, 30))
+        self._swatch.setIconSize(QtCore.QSize(24, 24))
 
     def color(self):
         """Representative color of the group (its first member)."""
@@ -1338,6 +1639,248 @@ class _ScreenPickOverlay(QtWidgets.QWidget):
             self.finished.emit()
 
 
+class _ClickLabel(QtWidgets.QLabel):
+    clicked = QtCore.Signal()
+
+    def mousePressEvent(self, e):
+        if e.button() == QtCore.Qt.LeftButton:
+            self.clicked.emit()
+
+
+def _settings():
+    return QtCore.QSettings("VGUtilities", "BaseColorManager")
+
+
+class _CollapsibleSection(QtWidgets.QWidget):
+    """
+    Section with a clickable header (▸ / ▾). Content goes in body_layout; the
+    open/closed state is remembered between sessions.
+    """
+
+    def __init__(self, title, key, expanded=False, parent=None):
+        super().__init__(parent)
+        self._title = title
+        self._key = f"section_{key}"
+        try:
+            expanded = str(_settings().value(self._key, expanded)).lower() in ("true", "1")
+        except Exception:
+            pass
+
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(6)
+
+        head = QtWidgets.QHBoxLayout()
+        self._header = _ClickLabel()
+        self._header.setCursor(QtCore.Qt.PointingHandCursor)
+        self._header.setStyleSheet("color: #B1B1B1; font-size: 11px;")
+        self._header.clicked.connect(lambda: self._set(not self._expanded))
+        line = QtWidgets.QFrame()
+        line.setFrameShape(QtWidgets.QFrame.HLine)
+        line.setFrameShadow(QtWidgets.QFrame.Sunken)
+        head.addWidget(self._header)
+        head.addWidget(line, 1)
+        outer.addLayout(head)
+
+        self.body = QtWidgets.QWidget()
+        self.body_layout = QtWidgets.QVBoxLayout(self.body)
+        self.body_layout.setContentsMargins(0, 0, 0, 0)
+        self.body_layout.setSpacing(6)
+        outer.addWidget(self.body)
+        self._set(expanded, save=False)
+
+    def _set(self, expanded, save=True):
+        self._expanded = expanded
+        self.body.setVisible(expanded)
+        self._header.setText(("▾  " if expanded else "▸  ") + self._title)
+        if save:
+            try:
+                _settings().setValue(self._key, expanded)
+            except Exception:
+                pass
+
+
+class _Toast(QtWidgets.QLabel):
+    """
+    Short message floating at the bottom of the panel, outside the layout so that showing
+    it never moves the controls. Fades after a few seconds; a click dismisses it.
+    """
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setWordWrap(True)
+        self.setMargin(8)
+        self.setStyleSheet(
+            "background: #2C2C2C; color: #E3E3E3; border: 1px solid #4B4B4B; "
+            "border-radius: 8px; font-size: 11px;")
+        self._timer = QtCore.QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.setInterval(6000)
+        self._timer.timeout.connect(self.hide)
+        self.hide()
+
+    def setText(self, text):
+        super().setText(text)
+        if not text:
+            self.hide()
+            return
+        self.reposition()
+        self.show()
+        self.raise_()
+        self._timer.start()
+
+    def reposition(self):
+        parent = self.parentWidget()
+        width = max(parent.width() - 16, 100)
+        self.setFixedWidth(width)
+        self.setFixedHeight(self.heightForWidth(width))
+        self.move(8, parent.height() - self.height() - 8)
+
+    def mousePressEvent(self, e):
+        self.hide()
+
+
+class _RowsContainer(QtWidgets.QWidget):
+    """
+    Holds the color rows and lets them be reordered by dragging their grip.
+    Emits row_moved(row, index) where *index* is the position among the rows once
+    the dragged row has been taken out.
+    """
+    row_moved = QtCore.Signal(object, int)
+
+    def __init__(self, scroll, parent=None):
+        super().__init__(parent)
+        self._scroll = scroll
+        self.setAcceptDrops(True)
+        self._indicator = QtWidgets.QFrame(self)
+        self._indicator.setFixedHeight(2)
+        self._indicator.setStyleSheet("background: #3B63FB; border-radius: 1px;")
+        self._indicator.hide()
+
+    def _rows(self):
+        return [self.layout().itemAt(i).widget() for i in range(self.layout().count() - 1)
+                if self.layout().itemAt(i).widget() is not None
+                and hasattr(self.layout().itemAt(i).widget(), "set_colors_direct")]
+
+    def _target(self, event):
+        """(dragged row, insertion index among the other rows, indicator y), or None."""
+        source = event.source()
+        rows = self._rows()
+        if source not in rows:
+            return None
+        others = [r for r in rows if r is not source]
+        y = event.position().toPoint().y()
+        index = len(others)
+        for i, r in enumerate(others):
+            if y < r.geometry().center().y():
+                index = i
+                break
+        if not others:
+            line_y = 0
+        elif index < len(others):
+            line_y = others[index].geometry().top() - 2
+        else:
+            line_y = others[-1].geometry().bottom() + 2
+        return source, index, line_y
+
+    def _autoscroll(self, event):
+        view = self._scroll.viewport()
+        y = self.mapTo(view, event.position().toPoint()).y()
+        bar = self._scroll.verticalScrollBar()
+        if y < 24:
+            bar.setValue(bar.value() - 12)
+        elif y > view.height() - 24:
+            bar.setValue(bar.value() + 12)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat(_ROW_MIME_TYPE) and self._target(event):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        target = self._target(event) if event.mimeData().hasFormat(_ROW_MIME_TYPE) else None
+        if not target:
+            event.ignore()
+            return
+        self._autoscroll(event)
+        self._indicator.setGeometry(0, target[2], self.width(), 2)
+        self._indicator.raise_()
+        self._indicator.show()
+        event.acceptProposedAction()
+
+    def dragLeaveEvent(self, event):
+        self._indicator.hide()
+
+    def dropEvent(self, event):
+        self._indicator.hide()
+        target = self._target(event) if event.mimeData().hasFormat(_ROW_MIME_TYPE) else None
+        if target:
+            event.acceptProposedAction()
+            self.row_moved.emit(target[0], target[1])
+
+
+class _AseDropArea(QtWidgets.QWidget):
+    """
+    Wraps the Applied colors strip. Dropping an .ase file emits ase_dropped(path); dropping
+    a row's color swatch emits color_dropped(color).
+    """
+    ase_dropped = QtCore.Signal(str)
+    color_dropped = QtCore.Signal(QtGui.QColor)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+        self._hot = False
+
+    @staticmethod
+    def _ase_paths(mime):
+        if not mime.hasUrls():
+            return []
+        return [u.toLocalFile() for u in mime.urls() if u.toLocalFile().lower().endswith(".ase")]
+
+    def _set_hot(self, hot):
+        if hot != self._hot:
+            self._hot = hot
+            self.setStyleSheet("_AseDropArea { border: 2px dashed #3B63FB; border-radius: 6px; }" if hot else "")
+
+    @staticmethod
+    def _row_color(mime):
+        """A color dragged from a row swatch (the strip's own swatches also carry the swatch marker)."""
+        if mime.hasFormat(_COLOR_MIME_TYPE) and not mime.hasFormat(_SWATCH_MIME_TYPE):
+            color = QtGui.QColor(bytes(mime.data(_COLOR_MIME_TYPE)).decode())
+            return color if color.isValid() else None
+        return None
+
+    def dragEnterEvent(self, event):
+        mime = event.mimeData()
+        if self._ase_paths(mime) or self._row_color(mime):
+            self._set_hot(True)
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        mime = event.mimeData()
+        if self._ase_paths(mime) or self._row_color(mime):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragLeaveEvent(self, event):
+        self._set_hot(False)
+
+    def dropEvent(self, event):
+        self._set_hot(False)
+        mime = event.mimeData()
+        color = self._row_color(mime)
+        if color:
+            self.color_dropped.emit(color)
+        for path in self._ase_paths(mime):
+            self.ase_dropped.emit(path)
+        event.acceptProposedAction()
+
+
 class _WideCombo(QtWidgets.QComboBox):
     """Combo box whose popup list is at least as wide as its longest item."""
 
@@ -1355,6 +1898,11 @@ class PalettePanel(QtWidgets.QWidget):
 
         self._project_was_open = None
         self._pick_overlays = []
+        self._swatches = []             # Applied colors: [(QColor, name)], saved in the project
+        self._swatches_loaded = False   # True once the open project's colors have been read
+        self._pending_swatch_move = None
+        self._swatch_sel = set()        # indexes of the selected swatches in the strip
+        self._sel_anchor = None         # where a Shift+click range starts
         self._picking_swatches = False  # eyedropper mode feeding the Applied colors strip
         self._picker_mode = _MODE_HUE   # remembered between color picker sessions
         self._connect_events()
@@ -1365,7 +1913,19 @@ class PalettePanel(QtWidgets.QWidget):
         self._poll_timer.timeout.connect(self._check_project_state)
         self._poll_timer.start()
 
-        root = QtWidgets.QVBoxLayout(self)
+        # The whole panel sits in a scroll area: the color list keeps room for 8 rows, and
+        # when the dock is shorter than that it is the panel that scrolls, not a cramped list.
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        panel_scroll = QtWidgets.QScrollArea()
+        panel_scroll.setWidgetResizable(True)
+        panel_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
+        panel_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        outer.addWidget(panel_scroll)
+        content = QtWidgets.QWidget()
+        panel_scroll.setWidget(content)
+
+        root = QtWidgets.QVBoxLayout(content)
         root.setSpacing(6)
         root.setContentsMargins(8, 8, 8, 8)
 
@@ -1401,7 +1961,9 @@ class PalettePanel(QtWidgets.QWidget):
         root.addLayout(header)
 
         # ── 1. Snapshots ─────────────────────────────────────────────────────
-        section("Snapshots")
+        snap_section = _CollapsibleSection("Snapshots", "snapshots", expanded=False)
+        root.addWidget(snap_section)
+        snap_root = snap_section.body_layout
         snap_row = QtWidgets.QHBoxLayout()
         snap_row.setSpacing(6)
         self._snap_combo = _WideCombo()
@@ -1421,7 +1983,7 @@ class PalettePanel(QtWidgets.QWidget):
             btn = _spectrum_icon_button(kind, variant, tip)
             btn.clicked.connect(slot)
             snap_row.addWidget(btn)
-        root.addLayout(snap_row)
+        snap_root.addLayout(snap_row)
 
         self._bake_btn = _spectrum_button(
             "Bake to layer", "secondary",
@@ -1438,19 +2000,16 @@ class PalettePanel(QtWidgets.QWidget):
         bake_row.setSpacing(6)
         bake_row.addWidget(self._bake_btn, 1)
         bake_row.addWidget(self._bake_vis_btn)
-        root.addLayout(bake_row)
+        snap_root.addLayout(bake_row)
 
-        self._snap_status = QtWidgets.QLabel("")
-        self._snap_status.setWordWrap(True)
-        self._snap_status.setStyleSheet("color: #888; font-size: 11px;")
-        root.addWidget(self._snap_status)
+        # Messages float over the bottom of the panel (no layout space reserved)
+        self._snap_status = _Toast(self)
 
         # ── 2. Layers: what is listed, how it is grouped, then the list itself ──
         section("Layers")
         self._ignore_hidden_cb = QtWidgets.QCheckBox("Ignore hidden layers")
         self._ignore_hidden_cb.setChecked(True)
         self._ignore_hidden_cb.stateChanged.connect(lambda _: self.refresh())
-        root.addWidget(self._ignore_hidden_cb)
 
         self._merge_cb = QtWidgets.QCheckBox("Group colors")
         self._merge_cb.setChecked(True)
@@ -1464,40 +2023,32 @@ class PalettePanel(QtWidgets.QWidget):
         self._sort_cb.setToolTip(
             "Order the rows by hue, then lightness (grays last),\n"
             "so close colors sit next to each other.\n"
-            "Unchecked: order of the layers in the project."
+            "Unchecked: your own order (drag the ⋮⋮ handle of a row to change it),\n"
+            "otherwise the order of the layers in the project."
         )
         self._sort_cb.stateChanged.connect(lambda _: self._group_timer.start())
-        group_opts = QtWidgets.QHBoxLayout()
-        group_opts.addWidget(self._merge_cb)
-        group_opts.addWidget(self._sort_cb)
-        group_opts.addStretch()
-        root.addLayout(group_opts)
 
-        sim_row = QtWidgets.QHBoxLayout()
-        sim_lbl = QtWidgets.QLabel("Similarity")
-        sim_lbl.setFixedWidth(64)
-        self._similarity_slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        self._similarity_slider.setRange(0, 30)
-        self._similarity_slider.setValue(30)   # start grouped as much as possible; lower it for more colors
-        self._similarity_slider.setToolTip(
-            "0: only identical colors are grouped.\n"
-            "Higher: colors closer than this perceptual distance (ΔE) are grouped too."
-        )
-        self._similarity_val = QtWidgets.QLabel(f"ΔE {self._similarity_slider.value()}")
-        self._similarity_val.setFixedWidth(52)
-        self._similarity_val.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
-        sim_row.addWidget(sim_lbl)
-        sim_row.addWidget(self._similarity_slider, 1)
-        sim_row.addWidget(self._similarity_val)
-        root.addLayout(sim_row)
+        # The three checkboxes live in a menu (they keep working as plain QCheckBox objects)
+        self._opts_menu = QtWidgets.QMenu(self)
+        for cb in (self._ignore_hidden_cb, self._merge_cb, self._sort_cb):
+            cb.setStyleSheet("QCheckBox { padding: 6px 14px; }")
+            action = QtWidgets.QWidgetAction(self._opts_menu)
+            action.setDefaultWidget(cb)
+            self._opts_menu.addAction(action)
+        opts_btn = _spectrum_icon_button("options", "secondary", "Layer list options")
+        opts_btn.clicked.connect(lambda: self._opts_menu.exec(
+            opts_btn.mapToGlobal(QtCore.QPoint(0, opts_btn.height()))))
+
+        # Range 0-50 is the perceptual distance (ΔE) threshold; artists only see the two ends.
+        self._similarity_slider = _spectrum_slider(
+            0, 50, 50,
+            "Left: only identical colors are grouped.\n"
+            "Right: similar colors are grouped too, the more so the further right.")
 
         self._group_timer = QtCore.QTimer(self)
         self._group_timer.setSingleShot(True)
         self._group_timer.setInterval(200)
         self._group_timer.timeout.connect(self.refresh)
-        self._similarity_slider.valueChanged.connect(
-            lambda v: self._similarity_val.setText(f"ΔE {v}" if v else "Identical")
-        )
         self._similarity_slider.valueChanged.connect(lambda _: self._group_timer.start())
 
         def _on_group_toggled(state):
@@ -1508,34 +2059,52 @@ class PalettePanel(QtWidgets.QWidget):
         # Group / Ungroup act on the checked rows; kept right above the list so they stay
         # next to the rows however tall the panel is.
         self._forced = []  # list of sets of entry keys the user grouped by hand
-        force_row = QtWidgets.QHBoxLayout()
-        force_row.setSpacing(6)
-        group_btn = _spectrum_button(
-            "Group selected", "secondary",
-            "Merge the checked rows into one group, whatever their colors.\n"
+        group_btn = _spectrum_icon_button(
+            "link", "secondary",
+            "Group selected\nMerge the checked rows into one group, whatever their colors.\n"
             "Kept until the panel is closed.")
         group_btn.clicked.connect(self._group_checked)
-        ungroup_btn = _spectrum_button(
-            "Ungroup", "secondary",
-            "Undo the manual grouping of the checked rows.\n"
+        ungroup_btn = _spectrum_icon_button(
+            "unlink", "secondary",
+            "Ungroup\nUndo the manual grouping of the checked rows.\n"
             "Automatic grouping (Similarity) is not affected.")
         ungroup_btn.clicked.connect(self._ungroup_checked)
-        force_row.addWidget(group_btn, 1)
-        force_row.addWidget(ungroup_btn, 1)
-        root.addLayout(force_row)
+
+        # Row 1: title + tools. Row 2: slider with its two ends named inline.
+        group_head = QtWidgets.QHBoxLayout()
+        group_head.setSpacing(6)
+        sim_title = QtWidgets.QLabel("Group by similarity")
+        sim_title.setStyleSheet("color: #E3E3E3;")
+        group_head.addWidget(sim_title)
+        group_head.addStretch()
+        for b in (opts_btn, group_btn, ungroup_btn):
+            group_head.addWidget(b)
+        root.addLayout(group_head)
+
+        sim_row = QtWidgets.QHBoxLayout()
+        sim_row.setSpacing(8)
+        sim_left, sim_right = QtWidgets.QLabel("Identical"), QtWidgets.QLabel("Similar")
+        for w in (sim_left, sim_right):
+            w.setStyleSheet(_MUTED_LABEL_QSS)
+        sim_row.addWidget(sim_left)
+        sim_row.addWidget(self._similarity_slider, 1)
+        sim_row.addWidget(sim_right)
+        root.addLayout(sim_row)
 
         self._scroll = QtWidgets.QScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
-        self._scroll.setMinimumHeight(140)
+        self._scroll.setFixedHeight(48)   # resized to fit the rows by _fit_list_height
 
-        self._container = QtWidgets.QWidget()
+        self._row_order = []   # entry keys in the order set by dragging; used when "Sort by hue" is off
+        self._container = _RowsContainer(self._scroll)
+        self._container.row_moved.connect(self._on_row_moved)
         self._rows_layout = QtWidgets.QVBoxLayout(self._container)
-        self._rows_layout.setSpacing(4)
+        self._rows_layout.setSpacing(3)
         self._rows_layout.setContentsMargins(0, 0, 0, 0)
         self._rows_layout.addStretch()
         self._scroll.setWidget(self._container)
-        root.addWidget(self._scroll, 3)
+        root.addWidget(self._scroll)
 
         # ── 3. Applied colors: dropping or clicking one applies hue + saturation ──
         swatch_header = QtWidgets.QHBoxLayout()
@@ -1552,38 +2121,69 @@ class PalettePanel(QtWidgets.QWidget):
             "colors to this strip. Esc or right-click to stop.")
         self._pick_btn.clicked.connect(self._start_swatch_picking)
         swatch_header.addWidget(self._pick_btn)
+        import_btn = _spectrum_icon_button(
+            "import", "secondary",
+            "Import an Adobe Color palette (.ase)\nYou can also drop the file on the colors area below.")
+        import_btn.clicked.connect(self._on_import_ase_clicked)
+        swatch_header.addWidget(import_btn)
         clear_btn = _spectrum_icon_button("delete", "secondary", "Clear the applied colors strip")
         clear_btn.clicked.connect(self._clear_swatches)
         swatch_header.addWidget(clear_btn)
         root.addLayout(swatch_header)
 
         # Empty-state hint, replaced by the strip as soon as a color is added.
+        self._ase_drop = _AseDropArea()
+        self._ase_drop.ase_dropped.connect(self._import_ase)
+        self._ase_drop.color_dropped.connect(lambda c: self._add_to_swatches(c, "Dragged from a group"))
+        drop_layout = QtWidgets.QVBoxLayout(self._ase_drop)
+        drop_layout.setContentsMargins(0, 0, 0, 0)
+        drop_layout.setSpacing(0)
+
         self._swatch_placeholder = QtWidgets.QLabel(
-            "No colors yet. Use the eyedropper to pick some,\n"
-            "or change a color above: it lands here.")
+            "No colors yet. Use the eyedropper, drop an Adobe Color\n"
+            ".ase file here, or change a color above: it lands here.")
         self._swatch_placeholder.setAlignment(QtCore.Qt.AlignCenter)
-        self._swatch_placeholder.setMinimumHeight(56)
+        self._swatch_placeholder.setMinimumHeight(44)
         self._swatch_placeholder.setStyleSheet(
             "color: #777; font-size: 11px; border: 1px dashed #4B4B4B; border-radius: 6px;")
-        root.addWidget(self._swatch_placeholder)
+        drop_layout.addWidget(self._swatch_placeholder)
 
         self._swatch_scroll = QtWidgets.QScrollArea()
         self._swatch_scroll.setWidgetResizable(True)
-        self._swatch_scroll.setMinimumHeight(56)
-        self._swatch_scroll.setMaximumHeight(140)
+        self._swatch_scroll.setFixedHeight(32)   # resized to fit the swatches by _fit_swatch_strip
         self._swatch_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
         self._swatch_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self._swatch_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
-        self._swatch_container = QtWidgets.QWidget()
+        self._swatch_container = _SwatchStrip()
+        self._swatch_container.swatch_moved.connect(self._on_swatch_moved)
+        self._swatch_container.fallback = self._ase_drop
+        self._swatch_container.background_clicked.connect(
+            lambda: self._set_swatch_selection(set(), None))
         self._swatch_layout = _FlowLayout(self._swatch_container, spacing=4)
         self._swatch_container.setLayout(self._swatch_layout)
         self._swatch_scroll.setWidget(self._swatch_container)
         self._swatch_scroll.hide()
-        root.addWidget(self._swatch_scroll)
+        drop_layout.addWidget(self._swatch_scroll)
+        root.addWidget(self._ase_drop)
+
+        self._apply_palette_btn = _spectrum_button(
+            "Apply in order", "secondary",
+            "Apply the colors of this strip, in order, to the color rows:\n"
+            "1st color → 1st row, 2nd → 2nd, and so on.\n"
+            "No swatch selected: all colors. One selected: it and the ones after it.\n"
+            "Several selected: only those, in the order of the strip.\n"
+            "Checked rows only if any are checked, otherwise all rows.\n"
+            "Hue + saturation are applied, each layer keeps its own brightness;\n"
+            "hold Ctrl to apply the exact colors.\n"
+            f"The previous state is kept in the '{PALETTE_BACKUP_SNAPSHOT}' snapshot.")
+        self._apply_palette_btn.clicked.connect(self._apply_palette_in_order)
+        root.addWidget(self._apply_palette_btn)
 
         # ── 4. Relative adjustment of the checked rows ───────────────────────
-        section("Adjust (relative)")
+        adjust_section = _CollapsibleSection("Adjust (relative)", "adjust", expanded=False)
+        root.addWidget(adjust_section)
+        adjust_root = adjust_section.body_layout
         self._offset_baseline = None   # list of (row, original colors) while sliders are away from 0
         self._offset_timer = QtCore.QTimer(self)
         self._offset_timer.setSingleShot(True)
@@ -1591,16 +2191,16 @@ class PalettePanel(QtWidgets.QWidget):
         self._offset_timer.timeout.connect(self._apply_offset)
 
         self._sat_slider, self._sat_val = self._make_offset_slider(
-            root, "Saturation", "Shift saturation of the checked rows (all rows if none checked),\n"
+            adjust_root, "Saturation", "Shift saturation of the checked rows (all rows if none checked),\n"
             "relative to their current value.")
         self._light_slider, self._light_val = self._make_offset_slider(
-            root, "Lightness", "Shift lightness of the checked rows (all rows if none checked),\n"
+            adjust_root, "Lightness", "Shift lightness of the checked rows (all rows if none checked),\n"
             "relative to their current value.")
 
         self._scope_lbl = QtWidgets.QLabel("")
         self._scope_lbl.setWordWrap(True)
         self._scope_lbl.setStyleSheet("color: #888; font-size: 11px;")
-        root.addWidget(self._scope_lbl)
+        adjust_root.addWidget(self._scope_lbl)
 
         adjust_btns = QtWidgets.QGridLayout()
         adjust_btns.setSpacing(6)
@@ -1625,9 +2225,40 @@ class PalettePanel(QtWidgets.QWidget):
         adjust_btns.addWidget(commit_btn, 1, 1)
         adjust_btns.setColumnStretch(0, 1)
         adjust_btns.setColumnStretch(1, 1)
-        root.addLayout(adjust_btns)
+        adjust_root.addLayout(adjust_btns)
+        root.addStretch(1)   # spare height stays at the bottom instead of stretching the lists
 
         self.refresh()
+
+    # ── Lists that grow with their content ───────────────────────────────────
+
+    _MAX_VISIBLE_ROWS = 8
+
+    def _fit_list_height(self):
+        """Height of the color list = its rows (up to 8, then it scrolls); no unused space."""
+        rows = self._all_rows()
+        if not rows:
+            self._scroll.setFixedHeight(48)   # room for the one-line message
+            return
+        row_h = max(32, rows[0].sizeHint().height())
+        spacing = self._rows_layout.spacing()
+        shown = min(len(rows), self._MAX_VISIBLE_ROWS)
+        self._scroll.setFixedHeight(shown * row_h + (shown - 1) * spacing + 4)
+
+    def _fit_swatch_strip(self):
+        """Height of the Applied colors strip = its wrapped swatches (max 140px, then it scrolls)."""
+        if not self._swatches:
+            return
+        width = max(self._swatch_scroll.viewport().width(), 1)
+        needed = self._swatch_layout.heightForWidth(width) + 4
+        self._swatch_scroll.setFixedHeight(max(32, min(needed, 140)))
+
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._fit_swatch_strip()   # a narrower panel wraps the swatches onto more lines
+        toast = getattr(self, "_snap_status", None)
+        if toast is not None and toast.isVisible():
+            toast.reposition()
 
     def _blend_mode(self):
         """
@@ -1639,22 +2270,11 @@ class PalettePanel(QtWidgets.QWidget):
     # ── Relative adjustment ──────────────────────────────────────────────────
 
     def _make_offset_slider(self, root, label, tooltip):
-        row = QtWidgets.QHBoxLayout()
-        lbl = QtWidgets.QLabel(label)
-        lbl.setFixedWidth(64)
-        slider = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        slider.setRange(-100, 100)
-        slider.setValue(0)
-        slider.setToolTip(tooltip)
+        slider = _spectrum_slider(-100, 100, 0, tooltip, filled=False)   # centered: no fill
         val = QtWidgets.QLabel("0%")
-        val.setFixedWidth(38)
-        val.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
         slider.valueChanged.connect(lambda v: val.setText(f"{v:+d}%" if v else "0%"))
         slider.valueChanged.connect(lambda _: self._offset_timer.start())
-        row.addWidget(lbl)
-        row.addWidget(slider, 1)
-        row.addWidget(val)
-        root.addLayout(row)
+        root.addLayout(_slider_block(label, slider, val))
         return slider, val
 
     def _all_rows(self):
@@ -1965,6 +2585,10 @@ class PalettePanel(QtWidgets.QWidget):
                 w.deleteLater()
 
     def refresh(self):
+        self._refresh_content()
+        self._fit_list_height()
+
+    def _refresh_content(self):
         self._offset_timer.stop()
         self._offset_baseline = None
         self._zero_sliders()
@@ -1975,6 +2599,7 @@ class PalettePanel(QtWidgets.QWidget):
         if not self._project_was_open:
             self._refresh_snapshots()
             self._update_scope_label()
+            self._unload_project_swatches()
             self._add_info("No project open.")
             return
 
@@ -1987,6 +2612,7 @@ class PalettePanel(QtWidgets.QWidget):
             self._refresh_snapshots()
             self._update_scope_label()
             entries = collect_all(ignore_hidden=self._ignore_hidden_cb.isChecked())
+            self._load_project_swatches()   # only once the document is readable
         except ValueError:
             self._project_was_open = None
             self._add_info("Project loading…")
@@ -2026,6 +2652,11 @@ class PalettePanel(QtWidgets.QWidget):
             groups, manual = self._apply_forced_groups(groups)
         if self._sort_cb.isChecked():
             groups.sort(key=lambda g: _hue_sort_key(g[0][2]))
+        elif self._row_order:
+            # custom order: a group goes where its earliest-placed member was; new layers go last
+            rank = {k: i for i, k in enumerate(self._row_order)}
+            end = len(rank)
+            groups.sort(key=lambda g: min((rank.get(self._entry_key(e), end) for e in g), default=end))
         return [_ColorRow(group, preserve_sv, get_checked,
                           manual=any(group is m for m in manual),
                           set_mode_fn=self._set_blend_mode,
@@ -2098,14 +2729,172 @@ class PalettePanel(QtWidgets.QWidget):
         lbl.setAlignment(QtCore.Qt.AlignCenter)
         self._rows_layout.insertWidget(0, lbl)
 
+    def _on_row_moved(self, row, index):
+        """A row was dropped at *index* (among the other rows): apply and remember the order."""
+        if self._offset_baseline is not None:
+            self._commit_offset()   # row widgets are about to be re-laid out; settle any adjustment first
+        self._rows_layout.removeWidget(row)
+        self._rows_layout.insertWidget(index, row)
+        self._row_order = [self._entry_key(e) for r in self._all_rows() for e in r._entries]
+        if self._sort_cb.isChecked():   # a hand-made order only makes sense without the hue sort
+            self._sort_cb.blockSignals(True)
+            self._sort_cb.setChecked(False)
+            self._sort_cb.blockSignals(False)
+            self._snap_status.setText("Custom order: 'Sort by hue' turned off.")
+
+    # ── Adobe Color (.ase) import ────────────────────────────────────────────
+
+    def _on_import_ase_clicked(self):
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, "Import Adobe Color palette", "", "Adobe Swatch Exchange (*.ase)")
+        if path:
+            self._import_ase(path)
+
+    def _import_ase(self, path):
+        from vg_pt_utils import vg_ase
+        try:
+            colors = vg_ase.parse_ase(path)
+        except Exception as e:
+            logging.error(f"VG Palette: could not read '{path}': {e}")
+            self._snap_status.setText("Could not read that file — is it an .ase palette?")
+            return
+        if not colors:
+            self._snap_status.setText("No colors found in that .ase file.")
+            return
+        self._swatches.extend(
+            (QtGui.QColor.fromRgbF(r, g, b), name or "Adobe Color") for name, (r, g, b) in colors)
+        self._swatches_changed(keep_selection=True)
+        self._snap_status.setText(f"Added {len(colors)} colors from {QtCore.QFileInfo(path).fileName()}.")
+
     def _remove_row(self, row_widget):
         to_remove = set(self._get_checked_rows())
         to_remove.add(row_widget)
         for row in to_remove:
             self._rows_layout.removeWidget(row)
             row.deleteLater()
+        self._fit_list_height()
+
+    # ── Applied colors strip (persisted in the project) ──────────────────────
 
     def _add_to_swatches(self, qcolor, layer_name):
+        self._swatches.append((QtGui.QColor(qcolor), layer_name))
+        self._swatches_changed(keep_selection=True)
+
+    def _swatches_changed(self, persist=True, keep_selection=False):
+        """
+        Redraw the strip from self._swatches and, for user edits, store it in the project.
+        The selection is indexes into the list, so it is dropped unless colors were only appended.
+        """
+        if not keep_selection:
+            self._swatch_sel = set()
+            self._sel_anchor = None
+        self._rebuild_swatches()
+        if persist and self._swatches_loaded and project.is_open():
+            save_applied_colors(self._swatches)
+
+    def _load_project_swatches(self):
+        """Read the open project's saved colors, once per project (refresh calls this)."""
+        if self._swatches_loaded:
+            return
+        self._swatches = load_applied_colors()
+        self._swatches_loaded = True
+        self._swatches_changed(persist=False)
+
+    def _unload_project_swatches(self):
+        """No project: empty the strip without touching what is stored."""
+        self._swatches_loaded = False
+        if self._swatches:
+            self._swatches = []
+            self._swatches_changed(persist=False)
+
+    def _rebuild_swatches(self):
+        while self._swatch_layout.count():
+            w = self._swatch_layout.takeAt(0).widget()
+            if w:
+                w.hide()
+                w.deleteLater()
+        for index, (color, name) in enumerate(self._swatches):
+            self._swatch_layout.addWidget(self._make_swatch(index, color, name))
+        has = bool(self._swatches)
+        self._swatch_placeholder.setVisible(not has)
+        self._swatch_scroll.setVisible(has)
+        self._swatch_container.updateGeometry()
+        self._fit_swatch_strip()
+        QtCore.QTimer.singleShot(0, self._fit_swatch_strip)   # again once the layout knows its width
+
+    def _on_swatch_moved(self, src, dst):
+        # Applied once the drag has ended: the dragged button must not be deleted before then.
+        self._pending_swatch_move = (src, dst)
+
+    def _finish_swatch_drag(self):
+        move, self._pending_swatch_move = self._pending_swatch_move, None
+        if move:
+            src, dst = move
+            QtCore.QTimer.singleShot(0, lambda: self._move_swatch(src, dst))
+
+    def _move_swatch(self, src, dst):
+        if 0 <= src < len(self._swatches):
+            self._swatches.insert(dst, self._swatches.pop(src))
+            self._swatches_changed()
+
+    def _remove_swatch(self, index):
+        if 0 <= index < len(self._swatches):
+            del self._swatches[index]
+            self._swatches_changed()
+
+    def _swatch_menu(self, btn, index, color, pos):
+        menu = QtWidgets.QMenu(btn)
+        copy = menu.addAction(f"Copy {color.name().upper()}")
+        remove = menu.addAction("Remove color")
+        menu.addSeparator()
+        select_all = menu.addAction("Select all")
+        deselect = menu.addAction("Deselect all")
+        chosen = menu.exec(btn.mapToGlobal(pos))
+        if chosen is copy:
+            QtWidgets.QApplication.clipboard().setText(color.name().upper())
+        elif chosen is remove:
+            QtCore.QTimer.singleShot(0, lambda: self._remove_swatch(index))
+        elif chosen is select_all:
+            self._set_swatch_selection(set(range(len(self._swatches))), index)
+        elif chosen is deselect:
+            self._set_swatch_selection(set(), None)
+
+    # ── Selection of swatches (clic / Ctrl+clic / Maj+clic) ──────────────────
+
+    _SWATCH_QSS = (
+        "QPushButton {{ border: {border}; padding: 0; margin: 0; "
+        "min-width: 26px; max-width: 26px; min-height: 26px; max-height: 26px; }}"
+        "QPushButton:hover {{ border-color: {hover}; }}")
+
+    def _swatch_style(self, selected):
+        if selected:
+            return self._SWATCH_QSS.format(border="2px solid #3B63FB", hover="#6C8CFF")
+        return self._SWATCH_QSS.format(border="1px solid rgba(255,255,255,0.28)",
+                                       hover="rgba(255,255,255,0.7)")
+
+    def _set_swatch_selection(self, selection, anchor):
+        self._swatch_sel = set(selection)
+        self._sel_anchor = anchor
+        for i in range(self._swatch_layout.count()):
+            w = self._swatch_layout.itemAt(i).widget()
+            if w:
+                w.setStyleSheet(self._swatch_style(i in self._swatch_sel))
+
+    def _on_swatch_clicked(self, index):
+        mods = QtWidgets.QApplication.keyboardModifiers()
+        ctrl = bool(mods & QtCore.Qt.ControlModifier)
+        shift = bool(mods & QtCore.Qt.ShiftModifier)
+        anchor = self._sel_anchor if self._sel_anchor is not None else index
+        if shift:
+            lo, hi = sorted((anchor, index))
+            span = set(range(lo, hi + 1))
+            self._set_swatch_selection((self._swatch_sel | span) if ctrl else span, anchor)
+        elif ctrl:
+            self._set_swatch_selection(self._swatch_sel ^ {index}, index)   # toggle one swatch
+        else:
+            self._set_swatch_selection({index}, index)
+
+    def _make_swatch(self, index, qcolor, layer_name):
         btn = _DraggableSwatch(qcolor)
         btn.setFixedSize(26, 26)
         btn.setCursor(QtCore.Qt.PointingHandCursor)
@@ -2113,30 +2902,63 @@ class PalettePanel(QtWidgets.QWidget):
         pix.fill(qcolor)
         btn.setIcon(QtGui.QIcon(pix))
         btn.setIconSize(QtCore.QSize(24, 24))
-        self._swatch_placeholder.hide()
-        self._swatch_scroll.show()
-        btn.setStyleSheet(
-            "QPushButton { border: 1px solid rgba(255,255,255,0.28); padding: 0; margin: 0; "
-            "min-width: 26px; max-width: 26px; min-height: 26px; max-height: 26px; }"
-            "QPushButton:hover { border-color: rgba(255,255,255,0.7); }"
-        )
+        btn.drag_done.connect(self._finish_swatch_drag)
+        btn.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        btn.customContextMenuRequested.connect(
+            lambda pos, b=btn, i=index, c=qcolor: self._swatch_menu(b, i, c, pos))
+        btn.setStyleSheet(self._swatch_style(index in self._swatch_sel))
         btn.setToolTip(
             f"{layer_name}\n{qcolor.name().upper()}\n"
-            "Click to apply to selection — drag to a row swatch\n"
-            "Hold Ctrl to apply the full color (keeps brightness too)")
-        btn.clicked.connect(lambda: self._apply_swatch_to_selection(
-            qcolor, bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)))
-        self._swatch_layout.addWidget(btn)
-        self._swatch_container.updateGeometry()
+            "Click: select (starting point for 'Apply in order') — Ctrl+click: add/remove — Shift+click: range\n"
+            "Double-click: apply to the layers selected in Painter (Alt: exact color)\n"
+            "Drag onto a row swatch to apply it — drag within the strip to reorder\n"
+            "Right-click for more")
+        btn.clicked.connect(lambda _=False, i=index: self._on_swatch_clicked(i))
+        btn.double_clicked.connect(
+            lambda alt, c=qcolor: self._apply_swatch_to_selection(c, alt))
+        return btn
+
+    def _apply_palette_in_order(self):
+        """Color n of the strip goes to row n (checked rows, else all rows)."""
+        if not project.is_open():
+            return
+        full = bool(QtWidgets.QApplication.keyboardModifiers() & QtCore.Qt.ControlModifier)
+        if self._offset_baseline is not None:
+            self._commit_offset()   # settle a running adjustment so rows hold their real colors
+        rows = self._offset_targets()
+        # none selected: all colors; one selected: it and the ones after it; several: just those
+        selected = sorted(i for i in self._swatch_sel if i < len(self._swatches))
+        if len(selected) == 1:
+            colors = [c for c, _ in self._swatches[selected[0]:]]
+        elif selected:
+            colors = [self._swatches[i][0] for i in selected]
+        else:
+            colors = [c for c, _ in self._swatches]
+        if not colors:
+            self._snap_status.setText("The Applied colors strip is empty.")
+            return
+        if not rows:
+            self._snap_status.setText("No color rows to apply to.")
+            return
+        try:
+            save_snapshot(PALETTE_BACKUP_SNAPSHOT)
+        except Exception as e:
+            logging.error(f"VG Palette: could not back up before applying the palette: {e}")
+            self._snap_status.setText("Could not create the backup snapshot — nothing applied.")
+            return
+        mode = False if full else self._drop_mode()
+        count = min(len(rows), len(colors))
+        for row, color in zip(rows, colors):   # zip stops at the shorter of the two
+            row._apply_new_color(color, add_to_history=False, _cascade=False, mode=mode)
+        self._refresh_snapshots()
+        msg = f"{count} color{'s' if count != 1 else ''} applied to {len(rows)} row{'s' if len(rows) != 1 else ''}"
+        if len(colors) > len(rows) and len(selected) != 1:   # from a starting point, the rest is simply unused
+            msg += f" — {len(colors) - len(rows)} extra color{'s' if len(colors) - len(rows) != 1 else ''} ignored"
+        self._snap_status.setText(msg + f". Undo: restore '{PALETTE_BACKUP_SNAPSHOT}'.")
 
     def _clear_swatches(self):
-        while self._swatch_layout.count():
-            item = self._swatch_layout.takeAt(0)
-            w = item.widget()
-            if w:
-                w.deleteLater()
-        self._swatch_scroll.hide()
-        self._swatch_placeholder.show()
+        self._swatches = []
+        self._swatches_changed()
 
     def _apply_swatch_to_selection(self, qcolor, full=False):
         if not project.is_open():

@@ -133,21 +133,40 @@ Applies a collection's Smart Material to **every Texture Set in every `.spp` pro
 
 #### Features
 
+**Color list**
+
 - **Click a color swatch** to open a color picker and apply the new color to the layer instantly.
 - **Click a layer name** to select that layer in the stack.
-- **Drag a color** from the Applied Colors strip at the bottom onto any row swatch to apply it directly.
-- **Applied Colors strip** — records every color change made in the session. Click a swatch to apply it to the currently selected fill layer(s) in the stack. By default only hue + saturation are applied (each layer keeps its brightness); hold **Ctrl** while clicking or dropping to apply the **full color**, brightness included (useful for black or very dark colors).
-- **Pick (eyedropper)** — button in the Applied Colors header. The screen is frozen as a screenshot (all monitors, including other apps); click anywhere on it (e.g. on a reference image) to add each sampled color to the strip, and keep clicking to add more. **Esc** or **right-click** exits the mode.
-- **Ignore hidden layers** *(checked by default)* — skips layers that are not visible.
 - **Group colors** — collapses layers that share the same color into a single row, so editing one updates all layers in the group simultaneously. The list covers **every Texture Set**.
-- **Similarity** — slider that also groups *similar* colors (perceptual distance, ΔE). At 0 only identical colors are grouped. Each layer in a group keeps its own color differences when a hue mode is used.
-- **Apply mode** — `Full color`, `Hue only` (keep each layer's Saturation and Brightness) or `Hue + saturation` (keep Brightness only), used when changing or dropping a color.
-- **Snapshots** — save named snapshots of every Base Color of every Texture Set (stored in the project file). A `Default` snapshot is taken the first time the panel opens on a project; restoring keeps an automatic backup.
-- **Bake to layer** — bakes the resulting Base Color of every Texture Set into a hidden fill layer on top of the stack, named after the selected snapshot. Baking the same snapshot again replaces its previous baked layer. The **eye button** next to it shows or hides the baked layer of the last restored snapshot (or the selected one if none was restored) in every Texture Set, and hides the baked layers of other snapshots. Restoring a snapshot while a baked layer is shown switches to that snapshot's baked layer.
-- **Adjust (relative)** — Saturation and Lightness sliders shift the checked rows (or all rows) relative to their current colors, with a live preview. Hold **Compare** to see the colors before the adjustment, **Apply** to keep it, **Reset** to undo it.
-- **Multi-color substances** — if a Substance material exposes multiple color parameters, each parameter gets its own row (e.g. *Terrazzo — Color1*, *Terrazzo — Grout Color*).
+- **Group by similarity** — slider that also groups *similar* colors. Far left: only identical colors are grouped; further right: more and more similar colors are merged. Each layer in a group keeps its own color differences when a hue mode is used.
+- **Group selected / Ungroup** — merge the checked rows into one group by hand, or undo it.
+- **Options menu** (sliders icon) — *Ignore hidden layers* (on by default), *Group colors*, *Sort by hue*.
+- **Reorder the rows** — drag the `⋮⋮` handle of a row to move it; a blue line shows where it will land. This turns *Sort by hue* off; the order is remembered per layer while the panel is open, even when you change the similarity.
 - **Checkbox selection** — check multiple rows to apply a color change or a drag-and-drop to all of them at once. Clicking **×** on any row also removes all currently checked rows.
+- **Multi-color substances** — if a Substance material exposes multiple color parameters, each parameter gets its own row (e.g. *Terrazzo — Color1*, *Terrazzo — Grout Color*).
+- **Compact layout** — the list grows with its content (up to 8 rows, then it scrolls), so no space is wasted. **Snapshots** and **Adjust** are collapsible sections (collapsed by default, state remembered), and status messages appear as a short floating notice instead of taking room in the panel.
 - **↺ button** — rescan the project at any time (the list refreshes automatically when a project is opened or closed).
+
+**Applied colors (palette)**
+
+The strip at the bottom is a palette **saved in the project file** (written when you save the project) and restored when you reopen it.
+
+- **Add colors** — every color you apply from a row, the **eyedropper** (screen sampling, all monitors, *Esc* or right-click to stop), an **Adobe Color `.ase` file** (drop it on the strip or use the import button; RGB, CMYK, Lab and Gray swatches), or by **dragging a row's swatch onto the strip** (handy to keep a color you tweaked with the Adjust sliders).
+- **Select swatches** — click selects (and is the starting point), **Ctrl+click** adds/removes one, **Shift+click** selects a range, a click on the empty part of the strip deselects. Right-click: *Copy HEX*, *Remove color*, *Select all*, *Deselect all*.
+- **Reorder** — drag a swatch within the strip.
+- **Apply in order** — applies the palette to the color rows, 1st color → 1st row, 2nd → 2nd, and so on (checked rows only if any are checked, otherwise all rows). With no swatch selected it uses all colors; with **one** selected, that color and the following ones; with **several**, only those, in strip order. Hue + saturation are applied (each layer keeps its brightness); hold **Ctrl** for the exact colors. The previous state is saved in a *Before palette (auto)* snapshot, so it can be undone by restoring it.
+- **Apply to the layers selected in Painter** — **double-click** a swatch (hold **Alt** for the exact color, brightness included).
+- **Apply to a row** — drag a swatch onto a row's swatch (hold **Ctrl** for the exact color).
+
+**Snapshots** *(collapsible section)*
+
+- **Snapshots** — save named snapshots of every Base Color of every Texture Set (stored in the project file). A `Default` snapshot is taken the first time the panel opens on a project; restoring keeps an automatic backup. Saving under an existing name offers to overwrite it.
+- **Bake to layer** — bakes the resulting Base Color of every Texture Set into a hidden fill layer on top of the stack, named after the selected snapshot. Baking the same snapshot again replaces its previous baked layer. The **eye button** next to it shows or hides the baked layer of the last restored snapshot (or the selected one if none was restored) in every Texture Set, and hides the baked layers of other snapshots. Restoring a snapshot while a baked layer is shown switches to that snapshot's baked layer.
+
+**Adjust (relative)** *(collapsible section)*
+
+- **Saturation / Lightness sliders** shift the checked rows (or all rows) relative to their current colors, with a live preview. Hold **Compare** to see the colors before the adjustment, **Apply** to keep it, **Reset** to undo it.
+- Sliders follow the Adobe Spectrum style.
 
 ---
 
